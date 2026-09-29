@@ -41,6 +41,21 @@ python app.py
 curl http://localhost:5001/health
 ```
 
+### Events Service (Flask)
+```bash
+cd events-service
+pip install -r requirements.txt
+python app.py
+# сервис поднимется на http://localhost:5001
+curl http://localhost:5001/health
+```
+
+Сервис реализован по контракту REST API (ПР2):
+- `openapi.yaml` — формальный контракт API;
+- `docs/api.md` — описание сущности Event и операций;
+- `docs/examples.http` — примеры запросов/ответов для каждой операции;
+- код разделён на слои: `api.py` (маршруты) → `services.py` (бизнес-логика) → `storage.py` (хранение).
+
 ### Attendance Service (Flask)
 ```bash
 cd attendance-service
@@ -69,8 +84,13 @@ event-map-app/
 │   ├── requirements.md      ← user stories и критерии приёмки
 │   └── architecture.svg     ← архитектурная схема
 ├── events-service/
-│   ├── app.py
-│   └── requirements.txt
+│   ├── app.py              ← точка входа
+│   ├── api.py              ← маршруты
+│   ├── services.py         ← бизнес-логика
+│   ├── storage.py          ← хранение (in-memory)
+│   ├── validation.py       ← валидация входных данных
+│   ├── openapi.yaml        ← контракт REST API (ПР2)
+│   ├── docs/               ← api.md, examples.http
 ├── attendance-service/
 │   ├── app.py
 │   └── requirements.txt

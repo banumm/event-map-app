@@ -1,0 +1,128 @@
+# ===================================================================== #
+# Events Service — примеры запросов и ответов (ПР2)
+# Формат: VS Code REST Client.
+# Запуск сервера: cd events-service && python app.py  (порт 5001)
+# ===================================================================== #
+
+@host = http://localhost:5001
+
+### 1. Информация о сервисе
+GET {{host}}/
+
+### 2. Health check
+GET {{host}}/health
+
+### 3. Список событий (пустая база)
+GET {{host}}/events
+
+### 4. Создание события (валидный запрос -> 201)
+# @name create
+POST {{host}}/events
+Content-Type: application/json
+
+{
+  "title": "Концерт в парке",
+  "description": "Живая музыка на открытой площадке",
+  "lat": 55.7558,
+  "lng": 37.6176,
+  "starts_at": "2026-10-01T19:00:00Z",
+  "category": "concert",
+  "organizer_id": "3f2a7c10-0000-4000-8000-000000000001"
+}
+
+### 5. Создание второго события (для пагинации/фильтров)
+POST {{host}}/events
+Content-Type: application/json
+
+{
+  "title": "Лекция о REST API",
+  "description": "Обзор принципов проектирования REST",
+  "lat": 59.9390,
+  "lng": 30.3158,
+  "starts_at": "2026-11-05T18:00:00Z",
+  "category": "lecture",
+  "organizer_id": "3f2a7c10-0000-4000-8000-000000000001"
+}
+
+### 6. Ошибка валидации: нет обязательного поля title -> 400
+#   {"error":"ValidationError","details":[{"field":"title","message":"обязательное поле отсутствует"}]}
+POST {{host}}/events
+Content-Type: application/json
+
+{
+  "description": "Без названия",
+  "lat": 55.7,
+  "lng": 37.6,
+  "starts_at": "2026-10-01T19:00:00Z",
+  "category": "concert",
+  "organizer_id": "3f2a7c10-0000-4000-8000-000000000001"
+}
+
+### 7. Ошибка валидации: неверный тип и категория -> 400
+POST {{host}}/events
+Content-Type: application/json
+
+{
+  "title": "OK",
+  "description": "Тест",
+  "lat": "не-число",
+  "lng": 999,
+  "starts_at": "не дата",
+  "category": "футбол",
+  "organizer_id": "3f2a7c10-0000-4000-8000-000000000001"
+}
+
+### 8. Получение одной записи (id из шага 4) -> 200
+GET {{host}}/events/{{create.response.body.id}}
+
+### 9. Получение несуществующей записи -> 404
+#   {"error":"NotFound","details":[{"field":"id","message":"событие ... не найдено"}]}
+GET {{host}}/events/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+
+### 10. Полное обновление (PUT) -> 200
+PUT {{host}}/events/{{create.response.body.id}}
+Content-Type: application/json
+
+{
+  "title": "Концерт в парке (обновлено)",
+  "description": "Живая музыка, перенесено на осень",
+  "lat": 55.7558,
+  "lng": 37.6176,
+  "starts_at": "2026-10-05T19:00:00Z",
+  "category": "concert",
+  "organizer_id": "3f2a7c10-0000-4000-8000-000000000001"
+}
+
+### 11. Частичное обновление (PATCH) -> 200
+PATCH {{host}}/events/{{create.response.body.id}}
+Content-Type: application/json
+
+{
+  "category": "meetup"
+}
+
+### 12. Список с фильтром по категории -> 200
+GET {{host}}/events?category=concert
+
+### 13. Список с фильтром по дате -> 200
+GET {{host}}/events?date_from=2026-10-01T00:00:00Z&date_to=2026-10-31T23:59:59Z
+
+### 14. Пагинация page/limit -> 200
+GET {{host}}/events?page=1&limit=1
+
+### 15. Пагинация: неверный limit -> 400
+#   {"error":"ValidationError","details":[{"field":"limit","message":"должно быть целым числом от 1 до 100"}]}
+GET {{host}}/events?page=0&limit=1000
+
+### 16. Некорректный JSON -> 400
+#   {"error":"BadRequest","details":[{"field":null,"message":"тело запроса не является корректным JSON"}]}
+POST {{host}}/events
+Content-Type: application/json
+
+{ это не json
+
+### 17. Удаление события -> 204
+DELETE {{host}}/events/{{create.response.body.id}}
+
+### 18. Удаление несуществующей записи -> 404
+DELETE {{host}}/events/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee

@@ -1,0 +1,249 @@
+openapi: 3.0.3
+info:
+  title: Events Service API
+  description: |
+    REST API сервиса мероприятий (ПР2). Основная сущность — Event.
+
+    Единый формат ошибок для всех операций:
+        {"error": "<Код>", "details": [{"field": "<поле>", "message": "<описание>"}]}
+    Коды ошибок: ValidationError (400), BadRequest (400), NotFound (404),
+    MethodNotAllowed (405), InternalServerError (500).
+  version: "1.0.0"
+servers:
+  - url: http://localhost:5001
+tags:
+  - name: Events
+    description: CRUD мероприятий
+paths:
+  /:
+    get:
+      tags: [System]
+      summary: Информация о сервисе
+      operationId: root
+      responses:
+        "200":
+          description: Список доступных эндпоинтов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service: { type: string }
+                  version: { type: string }
+                  endpoints: { type: array, items: { type: object } }
+  /health:
+    get:
+      tags: [System]
+      summary: Проверка работоспособности
+      operationId: health
+      responses:
+        "200":
+          description: Сервис работает
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string, example: events-service }
+  /events:
+    get:
+      tags: [Events]
+      summary: Список событий с пагинацией и фильтрами
+      operationId: listEvents
+      parameters:
+        - name: page
+          in: query
+          description: Номер страницы (>= 1)
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          description: Размер страницы (1..100)
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: category
+          in: query
+          description: Фильтр по категории
+          schema:
+            type: string
+            enum: [concert, lecture, exhibition, meetup, workshop]
+        - name: date_from
+          in: query
+          description: Только события, начинающиеся не раньше указанной даты (ISO 8601)
+          schema: { type: string, format: date-time }
+        - name: date_to
+          in: query
+          description: Только события, начинающиеся не позже указанной даты (ISO 8601)
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Страница списка событий
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, limit]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Event" }
+                  total: { type: integer, description: Всего записей по фильтру }
+                  page: { type: integer }
+                  limit: { type: integer }
+        "400":
+          $ref: "#/components/responses/ValidationError"
+    post:
+      tags: [Events]
+      summary: Создание нового события
+      operationId: createEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventCreate" }
+      responses:
+        "201":
+          description: Событие создано
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "400":
+          $ref: "#/components/responses/ValidationError"
+  /events/{event_id}:
+    parameters:
+      - name: event_id
+        in: path
+        required: true
+        description: UUID события
+        schema: { type: string }
+    get:
+      tags: [Events]
+      summary: Получение одного события
+      operationId: getEvent
+      responses:
+        "200":
+          description: Событие найдено
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Events]
+      summary: Полное обновление события
+      operationId: replaceEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventCreate" }
+      responses:
+        "200":
+          description: Событие обновлено
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Events]
+      summary: Частичное обновление события
+      operationId: patchEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventPatch" }
+      responses:
+        "200":
+          description: Событие обновлено
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Events]
+      summary: Удаление события
+      operationId: deleteEvent
+      responses:
+        "204":
+          description: Событие удалено
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  responses:
+    ValidationError:
+      description: Ошибка валидации входных данных
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Event:
+      type: object
+      required: [id, title, description, lat, lng, starts_at, category, organizer_id, created_at, updated_at]
+      properties:
+        id: { type: string, description: UUID события, readOnly: true }
+        title: { type: string, minLength: 2, maxLength: 100, description: Название события }
+        description: { type: string, minLength: 1, maxLength: 2000, description: Описание события }
+        lat: { type: number, minimum: -90, maximum: 90, description: Широта }
+        lng: { type: number, minimum: -180, maximum: 180, description: Долгота }
+        starts_at: { type: string, format: date-time, description: Дата и время начала (ISO 8601) }
+        category:
+          type: string
+          enum: [concert, lecture, exhibition, meetup, workshop]
+        organizer_id: { type: string, description: Идентификатор создателя (organizer) }
+        created_at: { type: string, format: date-time, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
+    EventCreate:
+      type: object
+      required: [title, description, lat, lng, starts_at, category, organizer_id]
+      properties:
+        title: { type: string, minLength: 2, maxLength: 100 }
+        description: { type: string, minLength: 1, maxLength: 2000 }
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+        starts_at: { type: string, format: date-time }
+        category: { type: string, enum: [concert, lecture, exhibition, meetup, workshop] }
+        organizer_id: { type: string }
+    EventPatch:
+      type: object
+      description: Любое подмножество полей EventCreate
+      properties:
+        title: { type: string, minLength: 2, maxLength: 100 }
+        description: { type: string, minLength: 1, maxLength: 2000 }
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+        starts_at: { type: string, format: date-time }
+        category: { type: string, enum: [concert, lecture, exhibition, meetup, workshop] }
+        organizer_id: { type: string }
+    Error:
+      type: object
+      required: [error, details]
+      properties:
+        error:
+          type: string
+          description: Машинный код ошибки
+          enum: [ValidationError, BadRequest, NotFound, MethodNotAllowed, InternalServerError]
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: [string, "null"]
+                description: Имя поля; null — ошибка уровня запроса
+              message:
+                type: string
+                description: Человекочитаемое описание
+            example:
+              field: title
+              message: "длина должна быть от 2 до 100 символов"
