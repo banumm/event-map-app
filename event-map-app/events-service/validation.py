@@ -22,6 +22,8 @@ ALLOWED_CATEGORIES = {
     "workshop",
 }
 
+CATEGORIES = ALLOWED_CATEGORIES
+
 REQUIRED_FIELDS = [
     "title",
     "description",

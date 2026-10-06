@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="430" viewBox="0 0 880 430" font-family="Arial, sans-serif">
+  <defs>
+    <marker id="crow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+      <path d="M0,0 L9,6 L0,12 L2,6 Z" fill="#2b4c7e"/>
+    </marker>
+  </defs>
+
+  <!-- categories -->
+  <g>
+    <rect x="30" y="70" width="340" height="232" fill="#ffffff" stroke="#2b4c7e" stroke-width="2"/>
+    <rect x="30" y="70" width="340" height="30" fill="#2b4c7e"/>
+    <text x="200" y="90" fill="#ffffff" font-size="15" font-weight="bold" text-anchor="middle">categories</text>
+    <line x1="30" y1="100" x2="370" y2="100" stroke="#2b4c7e"/>
+    <text x="42" y="124" font-size="13">id          [PK] UUID</text>
+    <line x1="30" y1="132" x2="370" y2="132" stroke="#c8d2e0"/>
+    <text x="42" y="156" font-size="13" font-weight="bold">name        NOT NULL, UNIQUE</text>
+    <line x1="30" y1="164" x2="370" y2="164" stroke="#c8d2e0"/>
+    <text x="42" y="188" font-size="13">slug        UNIQUE (мигр. 0002)</text>
+    <line x1="30" y1="196" x2="370" y2="196" stroke="#c8d2e0"/>
+    <text x="42" y="220" font-size="13">created_at  NOT NULL</text>
+    <line x1="30" y1="228" x2="370" y2="228" stroke="#c8d2e0"/>
+    <text x="42" y="250" font-size="12" fill="#555">связь 1:N с events</text>
+  </g>
+
+  <!-- events -->
+  <g>
+    <rect x="500" y="40" width="350" height="342" fill="#ffffff" stroke="#2b4c7e" stroke-width="2"/>
+    <rect x="500" y="40" width="350" height="30" fill="#2b4c7e"/>
+    <text x="675" y="60" fill="#ffffff" font-size="15" font-weight="bold" text-anchor="middle">events</text>
+    <line x1="500" y1="70" x2="850" y2="70" stroke="#2b4c7e"/>
+
+    <text x="512" y="94" font-size="13">id          [PK] UUID</text>
+    <line x1="500" y1="102" x2="850" y2="102" stroke="#c8d2e0"/>
+    <text x="512" y="126" font-size="13" font-weight="bold">title        NOT NULL, CHECK 2..100</text>
+    <line x1="500" y1="134" x2="850" y2="134" stroke="#c8d2e0"/>
+    <text x="512" y="158" font-size="13">description  NOT NULL, CHECK &lt;=2000</text>
+    <line x1="500" y1="166" x2="850" y2="166" stroke="#c8d2e0"/>
+    <text x="512" y="190" font-size="13">lat          NOT NULL, CHECK -90..90</text>
+    <line x1="500" y1="198" x2="850" y2="198" stroke="#c8d2e0"/>
+    <text x="512" y="222" font-size="13">lng          NOT NULL, CHECK -180..180</text>
+    <line x1="500" y1="230" x2="850" y2="230" stroke="#c8d2e0"/>
+    <text x="512" y="254" font-size="13">starts_at    NOT NULL</text>
+    <line x1="500" y1="262" x2="850" y2="262" stroke="#c8d2e0"/>
+    <text x="512" y="286" font-size="13" fill="#7a1f1f" font-weight="bold">category_id  [FK] -> categories.id</text>
+    <line x1="500" y1="294" x2="850" y2="294" stroke="#c8d2e0"/>
+    <text x="512" y="318" font-size="13">organizer_id NOT NULL</text>
+    <line x1="500" y1="326" x2="850" y2="326" stroke="#c8d2e0"/>
+    <text x="512" y="350" font-size="13">created_at / updated_at  NOT NULL</text>
+  </g>
+
+  <!-- relationship 1 --- N -->
+  <line x1="370" y1="150" x2="496" y2="150" stroke="#2b4c7e" stroke-width="3" marker-end="url(#crow)"/>
+  <text x="390" y="140" font-size="14" font-weight="bold" fill="#2b4c7e">1</text>
+  <text x="452" y="140" font-size="14" font-weight="bold" fill="#2b4c7e">N</text>
+  <text x="396" y="172" font-size="12" fill="#2b4c7e">FK category_id</text>
+</svg>

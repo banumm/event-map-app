@@ -30,6 +30,7 @@ paths:
                 properties:
                   service: { type: string }
                   version: { type: string }
+                  database: { type: string, description: Имя подключённой СУБД (sqlite/postgresql) }
                   endpoints: { type: array, items: { type: object } }
   /health:
     get:
@@ -38,7 +39,7 @@ paths:
       operationId: health
       responses:
         "200":
-          description: Сервис работает
+          description: Сервис работает, БД доступна
           content:
             application/json:
               schema:
@@ -46,6 +47,7 @@ paths:
                 properties:
                   status: { type: string, example: ok }
                   service: { type: string, example: events-service }
+                  database: { type: string, example: sqlite }
   /events:
     get:
       tags: [Events]

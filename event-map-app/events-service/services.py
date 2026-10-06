@@ -1,15 +1,16 @@
 """
 Слой бизнес-логики (services).
 
-Содержит правила предметной области: фильтрацию, пагинацию, сборку события,
-проверку существования. Не знает про HTTP — маршруты вызывают его через объект
-EventsService.
+Правила предметной области, валидация, сборка ответа. Данными управляет
+слой доступа (repository/), сессиями — database.db_session. Маршруты
+вызывают только методы EventsService.
 """
 
-from datetime import datetime
-
-from storage import InMemoryEventsStorage
-from validation import validate_event, validate_query_params
+from database import db_session, from_iso, to_iso, utcnow
+from models import Event
+from repository.categories import CategoryRepository
+from repository.events import EventRepository
+from validation import validate_event, validate_query_params, CATEGORIES
 
 
 class EventNotFoundError(Exception):
@@ -22,55 +23,60 @@ class ValidationFailedError(Exception):
         self.details = details
 
 
-class EventsService:
-    def __init__(self, storage=None):
-        self.storage = storage or InMemoryEventsStorage()
+def _serialize(event):
+    category_name = event.category.name if event.category else None
+    return {
+        "id": event.id,
+        "title": event.title,
+        "description": event.description,
+        "lat": event.lat,
+        "lng": event.lng,
+        "starts_at": to_iso(event.starts_at),
+        "category": category_name,
+        "organizer_id": event.organizer_id,
+        "created_at": to_iso(event.created_at),
+        "updated_at": to_iso(event.updated_at),
+    }
 
+
+class EventsService:
     # ---- список с пагинацией и фильтрами ----
     def list(self, page, limit, category=None, date_from=None, date_to=None):
         details = validate_query_params(
-            page=page,
-            limit=limit,
-            category=category,
-            date_from=date_from,
-            date_to=date_to,
+            page=page, limit=limit, category=category,
+            date_from=date_from, date_to=date_to,
         )
         if details:
             raise ValidationFailedError(details)
 
         page = int(page) if page is not None else 1
         limit = int(limit) if limit is not None else 20
-        date_from = datetime.fromisoformat(date_from.replace("Z", "+00:00")) if date_from else None
-        date_to = datetime.fromisoformat(date_to.replace("Z", "+00:00")) if date_to else None
+        start_dt = from_iso(date_from)
+        end_dt = from_iso(date_to)
 
-        events = self.storage.all()
+        with db_session() as session:
+            events_repo = EventRepository(session)
+            category_id = None
+            if category is not None:
+                cat = CategoryRepository(session).get_by_name(category)
+                category_id = cat.id if cat else None
 
-        if category is not None:
-            events = [e for e in events if e["category"] == category]
-        if date_from is not None:
-            events = [e for e in events if _parse(e["starts_at"]) >= date_from]
-        if date_to is not None:
-            events = [e for e in events if _parse(e["starts_at"]) <= date_to]
+            query = events_repo.base_query(
+                category_id=category_id, date_from=start_dt, date_to=end_dt,
+            )
+            total = events_repo.count(query)
+            rows = events_repo.page(query, limit, (page - 1) * limit)
+            items = [_serialize(e) for e in rows]
 
-        events.sort(key=lambda e: e["starts_at"])
-
-        total = len(events)
-        start = (page - 1) * limit
-        items = events[start:start + limit]
-
-        return {
-            "items": items,
-            "total": total,
-            "page": page,
-            "limit": limit,
-        }
+        return {"items": items, "total": total, "page": page, "limit": limit}
 
     # ---- получение одной записи ----
     def get(self, event_id):
-        event = self.storage.get(event_id)
-        if event is None:
-            raise EventNotFoundError(event_id)
-        return event
+        with db_session() as session:
+            event = EventRepository(session).get(event_id)
+            if event is None:
+                raise EventNotFoundError(event_id)
+            return _serialize(event)
 
     # ---- создание ----
     def create(self, payload):
@@ -78,67 +84,83 @@ class EventsService:
         if details:
             raise ValidationFailedError(details)
 
-        event_id = self.storage.next_id()
-        event = {
-            "id": event_id,
-            "title": payload["title"].strip(),
-            "description": payload["description"].strip(),
-            "lat": float(payload["lat"]),
-            "lng": float(payload["lng"]),
-            "starts_at": payload["starts_at"],
-            "category": payload["category"],
-            "organizer_id": payload["organizer_id"].strip(),
-            "created_at": self.storage.now_iso(),
-            "updated_at": self.storage.now_iso(),
-        }
-        return self.storage.create(event)
+        with db_session() as session:
+            category = CategoryRepository(session).get_or_create(payload["category"])
+            event = Event(
+                title=payload["title"].strip(),
+                description=payload["description"].strip(),
+                lat=float(payload["lat"]),
+                lng=float(payload["lng"]),
+                starts_at=from_iso(payload["starts_at"]),
+                category_id=category.id,
+                organizer_id=payload["organizer_id"].strip(),
+                created_at=utcnow(),
+                updated_at=utcnow(),
+            )
+            EventRepository(session).add(event)
+            session.flush()
+            return _serialize(event)
 
     # ---- полное обновление (PUT) ----
     def replace(self, event_id, payload):
-        existing = self.storage.get(event_id)
-        if existing is None:
-            raise EventNotFoundError(event_id)
+        with db_session() as session:
+            repo = EventRepository(session)
+            event = repo.get(event_id)
+            if event is None:
+                raise EventNotFoundError(event_id)
 
-        details = validate_event(payload)
-        if details:
-            raise ValidationFailedError(details)
+            details = validate_event(payload)
+            if details:
+                raise ValidationFailedError(details)
 
-        event = {
-            **existing,
-            "title": payload["title"].strip(),
-            "description": payload["description"].strip(),
-            "lat": float(payload["lat"]),
-            "lng": float(payload["lng"]),
-            "starts_at": payload["starts_at"],
-            "category": payload["category"],
-            "organizer_id": payload["organizer_id"].strip(),
-            "updated_at": self.storage.now_iso(),
-        }
-        return self.storage.replace(event_id, event)
+            category = CategoryRepository(session).get_or_create(payload["category"])
+            event.title = payload["title"].strip()
+            event.description = payload["description"].strip()
+            event.lat = float(payload["lat"])
+            event.lng = float(payload["lng"])
+            event.starts_at = from_iso(payload["starts_at"])
+            event.category_id = category.id
+            event.organizer_id = payload["organizer_id"].strip()
+            event.updated_at = utcnow()
+            return _serialize(event)
 
     # ---- частичное обновление (PATCH) ----
     def patch(self, event_id, patch):
-        existing = self.storage.get(event_id)
-        if existing is None:
-            raise EventNotFoundError(event_id)
+        with db_session() as session:
+            repo = EventRepository(session)
+            event = repo.get(event_id)
+            if event is None:
+                raise EventNotFoundError(event_id)
 
-        details = validate_event(patch, partial=True)
-        if details:
-            raise ValidationFailedError(details)
+            details = validate_event(patch, partial=True)
+            if details:
+                raise ValidationFailedError(details)
 
-        updated = dict(existing)
-        for field, value in patch.items():
-            if isinstance(value, str):
-                value = value.strip()
-            updated[field] = float(value) if field in ("lat", "lng") else value
-        updated["updated_at"] = self.storage.now_iso()
-        return self.storage.replace(event_id, updated)
+            for field, value in patch.items():
+                if field == "category":
+                    category = CategoryRepository(session).get_or_create(value)
+                    event.category_id = category.id
+                elif field in ("lat", "lng"):
+                    setattr(event, field, float(value))
+                elif field == "starts_at":
+                    event.starts_at = from_iso(value)
+                else:
+                    setattr(event, field, value.strip() if isinstance(value, str) else value)
+            event.updated_at = utcnow()
+            return _serialize(event)
 
     # ---- удаление ----
     def delete(self, event_id):
-        if not self.storage.delete(event_id):
-            raise EventNotFoundError(event_id)
+        with db_session() as session:
+            removed = EventRepository(session).remove(event_id)
+            if not removed:
+                raise EventNotFoundError(event_id)
 
 
-def _parse(value):
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+def seed_categories():
+    """Начальное наполнение справочника категорий (вызывается при старте)."""
+    with db_session() as session:
+        repo = CategoryRepository(session)
+        for name in CATEGORIES:
+            if repo.get_by_name(name) is None:
+                repo.create(name)

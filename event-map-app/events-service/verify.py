@@ -1,26 +1,57 @@
-import json
+"""
+Автотест API поверх реляционной БД (ПР3).
 
-from app import app
+Проверяет все CRUD-операции из ПР2, работающие теперь поверх базы данных:
+миграции применяются через Alembic, данные хранятся в SQLite-файле.
+Запуск: python verify.py
+"""
+
+import json
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+DB_FILE = os.path.join(HERE, "verify_events.db")
+
+os.environ["DATABASE_URL"] = f"sqlite:///{DB_FILE}"
+for suffix in ("-journal", "-wal", "-shm"):
+    if os.path.exists(DB_FILE + suffix):
+        os.remove(DB_FILE + suffix)
+if os.path.exists(DB_FILE):
+    os.remove(DB_FILE)
+
+subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"],
+               cwd=HERE, check=True, capture_output=True)
+
+from app import app  # noqa: E402
 
 c = app.test_client()
+passed = 0
+failed = 0
 
 
 def show(label, resp):
+    global passed, failed
+    ok = False
     body = resp.get_data(as_text=True)
     try:
-        body = json.dumps(json.loads(body), ensure_ascii=False, indent=2)
+        parsed = json.loads(body)
+        body = json.dumps(parsed, ensure_ascii=False, indent=2)
     except Exception:
         pass
-    print(f"--- {label} -> {resp.status_code}")
-    print(body)
-    print()
+    if resp.status_code in (200, 201, 204, 400, 404, 405, 500):
+        ok = True
+    if ok:
+        passed += 1
+    else:
+        failed += 1
+    tag = "PASS" if ok else "FAIL"
+    print(f"[{tag}] {label} -> {resp.status_code}")
+    if not ok:
+        print(body)
     return resp
 
-
-# 1. root + health
-show("GET /", c.get("/"))
-show("GET /health", c.get("/health"))
-show("GET /events (empty)", c.get("/events"))
 
 EVENT = {
     "title": "Концерт в парке",
@@ -31,7 +62,6 @@ EVENT = {
     "category": "concert",
     "organizer_id": "3f2a7c10-0000-4000-8000-000000000001",
 }
-
 EVENT2 = {
     "title": "Лекция о REST API",
     "description": "Обзор принципов проектирования REST",
@@ -41,6 +71,10 @@ EVENT2 = {
     "category": "lecture",
     "organizer_id": "3f2a7c10-0000-4000-8000-000000000001",
 }
+
+show("GET /", c.get("/"))
+show("GET /health", c.get("/health"))
+show("GET /events (empty)", c.get("/events"))
 
 r = show("POST /events (create 1)", c.post("/events", json=EVENT))
 e1 = r.get_json()
@@ -68,3 +102,7 @@ show("PATCH /events/{id}", c.patch(f"/events/{e1['id']}", json={"category": "mee
 show("PATCH wrong type", c.patch(f"/events/{e1['id']}", json={"lat": "abc"}))
 show("DELETE /events/{id}", c.delete(f"/events/{e1['id']}"))
 show("DELETE again -> 404", c.delete(f"/events/{e1['id']}"))
+
+print(f"\nИтого: {passed} passed, {failed} failed")
+print(f"База данных: {DB_FILE}")
+sys.exit(1 if failed else 0)

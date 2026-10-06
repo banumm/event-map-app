@@ -56,6 +56,23 @@ curl http://localhost:5001/health
 - `docs/examples.http` — примеры запросов/ответов для каждой операции;
 - код разделён на слои: `api.py` (маршруты) → `services.py` (бизнес-логика) → `storage.py` (хранение).
 
+Реляционная БД, миграции и слой доступа к данным (ПР3):
+- данные хранятся в реляционной БД (по умолчанию SQLite-файл `events.db`,
+  конфигурируемая через `DATABASE_URL` — см. `.env.example`; такой же код работает с PostgreSQL);
+- схема создаётся миграциями Alembic: `alembic upgrade head` / `alembic downgrade -1`;
+- слой доступа — `repository/` (DAO: `events.py`, `categories.py`), единственный, кто знает SQL/ORM;
+- транзакционность: `database.db_session` (Unit of Work), проверка в `verify_tx.py`;
+- проверки: `verify.py` (API поверх БД), `verify_persistence.py` (данные после перезапуска);
+
+```bash
+cd events-service
+pip install -r requirements.txt
+cp .env.example .env          # при необходимости задать DATABASE_URL
+alembic upgrade head          # применить миграции (создать схему)
+python app.py                 # запуск, порт 5001
+python verify.py              # автотест API поверх БД
+```
+
 ### Attendance Service (Flask)
 ```bash
 cd attendance-service
