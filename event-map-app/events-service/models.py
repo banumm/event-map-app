@@ -13,6 +13,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    PrimaryKeyConstraint,
     String,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -65,6 +66,10 @@ class Event(Base):
 
     category: Mapped["Category"] = relationship(back_populates="events")
 
+    participants: Mapped[list["EventParticipant"]] = relationship(
+        back_populates="event", cascade="all, delete-orphan"
+    )
+
     __table_args__ = (
         CheckConstraint("length(title) >= 2 AND length(title) <= 100",
                         name="ck_events_title_len"),
@@ -72,4 +77,57 @@ class Event(Base):
                         name="ck_events_description_len"),
         CheckConstraint("lat >= -90 AND lat <= 90", name="ck_events_lat_range"),
         CheckConstraint("lng >= -180 AND lng <= 180", name="ck_events_lng_range"),
+    )
+
+
+class User(Base):
+    """Пользователь платформы (организатор или посетитель)."""
+
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+
+    registrations: Mapped[list["EventParticipant"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        CheckConstraint("role IN ('admin', 'organizer', 'user')",
+                        name="ck_users_role"),
+    )
+
+
+class EventParticipant(Base):
+    """Регистрация пользователя на мероприятие (связь N:M).
+
+    Составной первичный ключ (event_id, user_id): один пользователь может быть
+    зарегистрирован на мероприятие только один раз. Внешние ключи с ON DELETE
+    CASCADE — при удалении события или пользователя регистрации удаляются.
+    """
+
+    __tablename__ = "event_participants"
+
+    event_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("events.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    registered_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=utcnow
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    event: Mapped["Event"] = relationship(back_populates="participants")
+    user: Mapped["User"] = relationship(back_populates="registrations")
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('registered', 'attended', 'cancelled')",
+            name="ck_participant_status",
+        ),
     )

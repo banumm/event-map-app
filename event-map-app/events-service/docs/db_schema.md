@@ -7,14 +7,19 @@
 
 - Миграция `0001` — создание таблиц `categories` и `events`.
 - Миграция `0002` — правка схемы: поле `categories.slug` + составной индекс.
+- Миграция `0003` — пользователи `users` и связующая таблица `event_participants`.
 
 ER-диаграмма: `er-diagram.svg`, `er-diagram.mmd` (Mermaid).
 
 ## Отношения
 
-Связь **1:N**: одна категория (`categories`) →
-много мероприятий (`events`). Внешний ключ с типом `RESTRICT` — нельзя удалить
-категорию, пока есть мероприятия в ней.
+1. **1:N** — одна категория (`categories`) → много мероприятий (`events`).
+   Внешний ключ с типом `RESTRICT` — нельзя удалить категорию, пока есть
+   мероприятия в ней.
+2. **N:M** — пользователи ↔ мероприятия: связь реализована через связующую
+   таблицу `event_participants` (регистрации посетителей). Внешние ключи с
+   типом `CASCADE` — при удалении события или пользователя его регистрации
+   удаляются автоматически.
 
 ## Таблица categories (справочник категорий)
 
@@ -40,29 +45,56 @@ ER-диаграмма: `er-diagram.svg`, `er-diagram.mmd` (Mermaid).
 | created_at    | datetime       | NOT NULL, default = now                            |
 | updated_at    | datetime       | NOT NULL, обновляется при изменении записи         |
 
+## Таблица users (пользователи платформы)
+
+| Поле       | Тип             | Ограничения                              |
+|------------|-----------------|------------------------------------------|
+| id         | string (36)     | PRIMARY KEY, UUID                        |
+| name       | string (100)    | NOT NULL                                 |
+| email      | string (255)    | NOT NULL, UNIQUE (uq_users_email)        |
+| role       | string (20)     | NOT NULL, CHECK in (admin, organizer, user) |
+| created_at | datetime        | NOT NULL                                 |
+
+## Таблица event_participants (регистрации, связь N:M)
+
+| Поле          | Тип         | Ограничения                                            |
+|---------------|-------------|--------------------------------------------------------|
+| event_id      | string (36) | PK (составной), FK → events.id, ON DELETE CASCADE      |
+| user_id       | string (36) | PK (составной), FK → users.id, ON DELETE CASCADE       |
+| registered_at | datetime    | NOT NULL, default = now                                |
+| status        | string (20) | NOT NULL, CHECK in (registered, attended, cancelled)   |
+
+Составной первичный ключ `(event_id, user_id)` гарантирует: один пользователь
+регистрируется на одно мероприятие только один раз.
+
 ## Индексы и обоснование
 
-| Индекс                          | Таблица     | Колонки                  | Зачем (частый запрос ПР2)              |
-|---------------------------------|-------------|--------------------------|----------------------------------------|
-| ix_events_category_id           | events      | category_id              | фильтр списка по категории             |
-| ix_events_category_starts_at    | events      | (category_id, starts_at) | фильтр категория+даты и ORDER BY starts_at |
+| Индекс                          | Таблица            | Колонки                  | Зачем (частые запросы)               |
+|---------------------------------|--------------------|--------------------------|--------------------------------------|
+| ix_events_category_id           | events             | category_id              | фильтр списка по категории, поддержка FK |
+| ix_events_category_starts_at    | events             | (category_id, starts_at) | фильтр категория+даты и ORDER BY starts_at |
+| ix_event_participants_user_id   | event_participants | user_id                  | запрос «на какие события записан пользователь», поддержка FK |
 
-Составной индекс ведёт с `category_id`, поэтому покрывает главный сценарий:
-`WHERE category_id = ? AND starts_at BETWEEN ? AND ? ORDER BY starts_at`.
+Составной индекс `(category_id, starts_at)` ведёт с `category_id`, поэтому покрывает
+главный сценарий API: `WHERE category_id = ? AND starts_at BETWEEN ? AND ? ORDER BY starts_at`.
 
-## Транзакции
+## Агрегатные запросы и транзакции
 
-`database.db_session` — единица работы: commit при успехе, rollback при ошибке.
-Демонстрация атомарности:
-- `verify_tx.py` — (1) отдельный сценарий «категория + событие» в одной
-  транзакции: при ошибке CHECK на событии откатывается и вставка категории;
-  (2) пакетная вставка нескольких событий при сбое одной записи откатывается целиком.
+- `ParticipantRepository.counts_per_event()` — агрегат `GROUP BY event_id`,
+  число участников по каждому событию.
+- `verify_schema.py` — демонстрация new-сущностей: регистрации (N:M),
+  агрегат, защита от дублей составным PK, каскадное удаление.
+- `database.db_session` — единица работы: commit при успехе, rollback при ошибке.
+  Демонстрация атомарности:
+  - `verify_tx.py` — (1) «категория + событие» в одной транзакции: при ошибке
+    CHECK на событии откатывается и вставка категории; (2) пакетная вставка
+    событий при сбое одной записи откатывается целиком.
 
 ## Как применить миграции
 
 ```bash
 cd events-service
-alembic upgrade head      # создать всю схему с нуля
+alembic upgrade head      # создать всю схему с нуля (0001 -> 0002 -> 0003)
 alembic downgrade -1      # продемонстрировать откат последней миграции
 alembic upgrade head      # вернуть схему обратно
 ```

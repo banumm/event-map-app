@@ -1,5 +1,7 @@
 erDiagram
     CATEGORIES ||--o{ EVENTS : "имеет"
+    EVENTS ||--o{ EVENT_PARTICIPANTS : "принимает"
+    USERS ||--o{ EVENT_PARTICIPANTS : "регистрируется"
     CATEGORIES {
         string id PK "UUID"
         string name "NOT NULL, UNIQUE"
@@ -17,4 +19,17 @@ erDiagram
         string organizer_id "NOT NULL"
         datetime created_at "NOT NULL"
         datetime updated_at "NOT NULL"
+    }
+    USERS {
+        string id PK "UUID"
+        string name "NOT NULL"
+        string email "NOT NULL, UNIQUE"
+        string role "NOT NULL, CHECK admin/organizer/user"
+        datetime created_at "NOT NULL"
+    }
+    EVENT_PARTICIPANTS {
+        string event_id PK, FK "-> events.id"
+        string user_id PK, FK "-> users.id"
+        datetime registered_at "NOT NULL"
+        string status "NOT NULL, CHECK registered/attended/cancelled"
     }

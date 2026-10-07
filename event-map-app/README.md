@@ -59,10 +59,13 @@ curl http://localhost:5001/health
 Реляционная БД, миграции и слой доступа к данным (ПР3):
 - данные хранятся в реляционной БД (по умолчанию SQLite-файл `events.db`,
   конфигурируемая через `DATABASE_URL` — см. `.env.example`; такой же код работает с PostgreSQL);
-- схема создаётся миграциями Alembic: `alembic upgrade head` / `alembic downgrade -1`;
-- слой доступа — `repository/` (DAO: `events.py`, `categories.py`), единственный, кто знает SQL/ORM;
+- схема создаётся миграциями Alembic: `alembic upgrade head` / `alembic downgrade -1`
+  (0001 — категории и события, 0002 — slug и составной индекс, 0003 — users и event_participants);
+- слой доступа — `repository/` (DAO: `events.py`, `categories.py`, `users.py`, `participants.py`),
+  единственный, кто знает SQL/ORM;
 - транзакционность: `database.db_session` (Unit of Work), проверка в `verify_tx.py`;
-- проверки: `verify.py` (API поверх БД), `verify_persistence.py` (данные после перезапуска);
+- проверки: `verify.py` (API поверх БД), `verify_schema.py` (users/регистрации/агрегаты),
+  `verify_persistence.py` (данные после перезапуска);
 
 ```bash
 cd events-service
