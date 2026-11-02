@@ -1,25 +1,58 @@
 # ===================================================================== #
-# Events Service — примеры запросов и ответов (ПР2, продолжено в ПР3)
+# Events Service — примеры запросов (ПР2–ПР4)
 # Формат: VS Code REST Client.
-# Запуск сервера: cd events-service && alembic upgrade head && python app.py
-# (порт 5001). Начиная с ПР3 данные хранятся в реляционной БД и
-# сохраняются между перезапусками сервера — см. verify_persistence.py.
+#
+# Запуск:
+#   users-service:      python manage.py migrate && python manage.py runserver 8000
+#   events-service:     alembic upgrade head && python app.py
+#
+# JWT выдаёт users-service. Изменение событий доступно ролям organizer/admin.
 # ===================================================================== #
 
+@users = http://localhost:8000
 @host = http://localhost:5001
 
-### 1. Информация о сервисе
-GET {{host}}/
+# Токены для проверки 403/204 задайте вручную после /auth/login
+# (admin создаётся командой python manage.py create_admin).
+@userToken = <JWT роли user>
+@otherOrganizerToken = <JWT другого organizer>
+@adminToken = <JWT роли admin>
 
-### 2. Health check
+### 0. Регистрация организатора (если ещё нет)
+POST {{users}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "organizer1",
+  "email": "organizer1@example.com",
+  "password": "StrongPass123",
+  "role": "organizer"
+}
+
+### 1. Вход организатора -> access_token
+# @name login
+POST {{users}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "organizer1",
+  "password": "StrongPass123"
+}
+
+### 2. Кто я (проверка токена)
+GET {{users}}/auth/me
+Authorization: Bearer {{login.response.body.access_token}}
+
+### 3. Health check events-service
 GET {{host}}/health
 
-### 3. Список событий (пустая база)
+### 4. Список событий (публично) -> 200
 GET {{host}}/events
 
-### 4. Создание события (валидный запрос -> 201)
+### 5. Создание события организатором -> 201
 # @name create
 POST {{host}}/events
+Authorization: Bearer {{login.response.body.access_token}}
 Content-Type: application/json
 
 {
@@ -28,61 +61,70 @@ Content-Type: application/json
   "lat": 55.7558,
   "lng": 37.6176,
   "starts_at": "2026-10-01T19:00:00Z",
-  "category": "concert",
-  "organizer_id": "3f2a7c10-0000-4000-8000-000000000001"
+  "category": "concert"
 }
 
-### 5. Создание второго события (для пагинации/фильтров)
+### 6. Создание без токена -> 401
+# {"error":{"code":"Unauthorized","message":"Требуется аутентификация","details":[]}}
 POST {{host}}/events
 Content-Type: application/json
 
 {
-  "title": "Лекция о REST API",
-  "description": "Обзор принципов проектирования REST",
-  "lat": 59.9390,
-  "lng": 30.3158,
-  "starts_at": "2026-11-05T18:00:00Z",
-  "category": "lecture",
-  "organizer_id": "3f2a7c10-0000-4000-8000-000000000001"
+  "title": "Без токена",
+  "description": "Запрос должен быть отклонён",
+  "lat": 55.75,
+  "lng": 37.61,
+  "starts_at": "2026-10-01T19:00:00Z",
+  "category": "concert"
 }
 
-### 6. Ошибка валидации: нет обязательного поля title -> 400
-#   {"error":"ValidationError","details":[{"field":"title","message":"обязательное поле отсутствует"}]}
+### 7. Создание с ролью user -> 403
+# Получите токен обычного пользователя через /auth/login.
+# {"error":{"code":"Forbidden","message":"Недостаточно прав...","details":[...]}}
 POST {{host}}/events
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "title": "Пользователь не организатор",
+  "description": "Запрос должен быть отклонён",
+  "lat": 55.75,
+  "lng": 37.61,
+  "starts_at": "2026-10-01T19:00:00Z",
+  "category": "concert"
+}
+
+### 8. Получение одной записи -> 200
+GET {{host}}/events/{{create.response.body.id}}
+
+### 9. Несуществующая запись -> 404
+# {"error":{"code":"NotFound","message":"Мероприятие не найдено","details":[...]}}
+GET {{host}}/events/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+
+### 10. Ошибка валидации -> 400
+# {"error":{"code":"ValidationError","message":"Ошибка валидации","details":[...]}}
+POST {{host}}/events
+Authorization: Bearer {{login.response.body.access_token}}
 Content-Type: application/json
 
 {
   "description": "Без названия",
-  "lat": 55.7,
-  "lng": 37.6,
-  "starts_at": "2026-10-01T19:00:00Z",
-  "category": "concert",
-  "organizer_id": "3f2a7c10-0000-4000-8000-000000000001"
-}
-
-### 7. Ошибка валидации: неверный тип и категория -> 400
-POST {{host}}/events
-Content-Type: application/json
-
-{
-  "title": "OK",
-  "description": "Тест",
   "lat": "не-число",
   "lng": 999,
   "starts_at": "не дата",
-  "category": "футбол",
-  "organizer_id": "3f2a7c10-0000-4000-8000-000000000001"
+  "category": "футбол"
 }
 
-### 8. Получение одной записи (id из шага 4) -> 200
-GET {{host}}/events/{{create.response.body.id}}
+### 11. Некорректный JSON -> 400
+POST {{host}}/events
+Authorization: Bearer {{login.response.body.access_token}}
+Content-Type: application/json
 
-### 9. Получение несуществующей записи -> 404
-#   {"error":"NotFound","details":[{"field":"id","message":"событие ... не найдено"}]}
-GET {{host}}/events/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+{ это не json
 
-### 10. Полное обновление (PUT) -> 200
+### 12. Полное обновление своего события -> 200
 PUT {{host}}/events/{{create.response.body.id}}
+Authorization: Bearer {{login.response.body.access_token}}
 Content-Type: application/json
 
 {
@@ -91,40 +133,37 @@ Content-Type: application/json
   "lat": 55.7558,
   "lng": 37.6176,
   "starts_at": "2026-10-05T19:00:00Z",
-  "category": "concert",
-  "organizer_id": "3f2a7c10-0000-4000-8000-000000000001"
+  "category": "concert"
 }
 
-### 11. Частичное обновление (PATCH) -> 200
+### 13. Частичное обновление -> 200
 PATCH {{host}}/events/{{create.response.body.id}}
+Authorization: Bearer {{login.response.body.access_token}}
 Content-Type: application/json
 
 {
   "category": "meetup"
 }
 
-### 12. Список с фильтром по категории -> 200
-GET {{host}}/events?category=concert
-
-### 13. Список с фильтром по дате -> 200
-GET {{host}}/events?date_from=2026-10-01T00:00:00Z&date_to=2026-10-31T23:59:59Z
-
-### 14. Пагинация page/limit -> 200
-GET {{host}}/events?page=1&limit=1
-
-### 15. Пагинация: неверный limit -> 400
-#   {"error":"ValidationError","details":[{"field":"limit","message":"должно быть целым числом от 1 до 100"}]}
-GET {{host}}/events?page=0&limit=1000
-
-### 16. Некорректный JSON -> 400
-#   {"error":"BadRequest","details":[{"field":null,"message":"тело запроса не является корректным JSON"}]}
-POST {{host}}/events
+### 14. Чужое событие -> 403
+PUT {{host}}/events/{{create.response.body.id}}
+Authorization: Bearer {{otherOrganizerToken}}
 Content-Type: application/json
 
-{ это не json
+{
+  "title": "Чужое событие",
+  "description": "Организатор не владелец",
+  "lat": 55.75,
+  "lng": 37.61,
+  "starts_at": "2026-10-05T19:00:00Z",
+  "category": "concert"
+}
 
-### 17. Удаление события -> 204
+### 15. Удаление владельцем -> 204
 DELETE {{host}}/events/{{create.response.body.id}}
+Authorization: Bearer {{login.response.body.access_token}}
 
-### 18. Удаление несуществующей записи -> 404
-DELETE {{host}}/events/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+### 16. Удаление администратором -> 204
+# Токен admin получается через /auth/login или management-команду create_admin.
+DELETE {{host}}/events/{{create.response.body.id}}
+Authorization: Bearer {{adminToken}}

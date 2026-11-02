@@ -1,1 +1,4 @@
 Django==5.0.7
+PyJWT==2.10.1
+argon2-cffi==25.1.0
+python-dotenv==1.1.1

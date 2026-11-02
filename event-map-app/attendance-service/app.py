@@ -1,58 +1,125 @@
 """
 Attendance Service
-Зона ответственности: отметки "пойду / интересно", счётчик участников, напоминания.
+
+Зона ответственности: отметки "пойду / интересно", счётчик участников.
 Владеет данными: связи user <-> event, статусы участия.
+
+Изменение данных защищено JWT (users-service). Обычный пользователь может
+отмечать только себя, администратор — любого пользователя.
 """
 
-from flask import Flask, jsonify, request
-from datetime import datetime
+import os
 import uuid
+from datetime import datetime, timezone
+
+from flask import Flask, jsonify, request
+
+from auth import current_user, require_auth
+from errors import ApiError, error_response, register_error_handlers
 
 app = Flask(__name__)
 
-# Временное in-memory хранилище (в реальном проекте — БД, например PostgreSQL)
 attendance_db = {}
 
 ALLOWED_STATUSES = {"going", "interested", "cancelled"}
 
 
-@app.route("/health", methods=["GET"])
+def _json_body():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        raise ApiError(
+            400,
+            "BadRequest",
+            "Тело запроса должно быть JSON-объектом",
+        )
+    return data
+
+
+@app.get("/")
+def root():
+    return jsonify({
+        "service": "attendance-service",
+        "version": "4.0.0",
+        "auth": {
+            "type": "JWT Bearer",
+            "note": "пользователь отмечает только себя, admin — любого",
+        },
+        "endpoints": [
+            {"method": "GET", "path": "/health"},
+            {"method": "POST", "path": "/attendance", "auth": True},
+            {"method": "GET", "path": "/attendance/event/{event_id}"},
+            {"method": "GET", "path": "/attendance/user/{user_id}", "auth": True},
+        ],
+    }), 200
+
+
+@app.get("/health")
 def health():
     return jsonify({"status": "ok", "service": "attendance-service"}), 200
 
 
-@app.route("/attendance", methods=["POST"])
+@app.post("/attendance")
+@require_auth
 def mark_attendance():
-    """
-    Отметить участие в мероприятии.
-    В реальной реализации здесь должен быть внутренний вызов к Events Service,
-    чтобы убедиться, что событие существует и ещё не прошло.
-    """
-    data = request.get_json(force=True)
+    """Отметить участие в мероприятии от имени текущего пользователя."""
+    data = _json_body()
+    actor = current_user()
 
-    required_fields = ["user_id", "event_id", "status"]
+    required_fields = ["event_id", "status"]
     missing = [f for f in required_fields if f not in data]
     if missing:
-        return jsonify({"error": f"Missing fields: {missing}"}), 400
+        raise ApiError(
+            400,
+            "ValidationError",
+            "Ошибка валидации",
+            [{"field": f, "message": "обязательное поле отсутствует"} for f in missing],
+        )
+
+    if not isinstance(data["event_id"], str) or not data["event_id"].strip():
+        raise ApiError(
+            400,
+            "ValidationError",
+            "Ошибка валидации",
+            [{"field": "event_id", "message": "должно быть непустой строкой"}],
+        )
 
     if data["status"] not in ALLOWED_STATUSES:
-        return jsonify({"error": f"status must be one of {ALLOWED_STATUSES}"}), 400
+        raise ApiError(
+            400,
+            "ValidationError",
+            "Ошибка валидации",
+            [{
+                "field": "status",
+                "message": f"допустимые значения: {', '.join(sorted(ALLOWED_STATUSES))}",
+            }],
+        )
 
-    record_id = str(uuid.uuid4())
+    user_id = str(actor["sub"])
+    requested_user_id = data.get("user_id")
+    if requested_user_id is not None and str(requested_user_id) != user_id:
+        if actor.get("role") != "admin":
+            raise ApiError(
+                403,
+                "Forbidden",
+                "Отмечать участие можно только от своего имени",
+                [{"field": "user_id", "message": "недостаточно прав"}],
+            )
+        user_id = str(requested_user_id)
+
     record = {
-        "id": record_id,
-        "user_id": data["user_id"],
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
         "event_id": data["event_id"],
         "status": data["status"],
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    attendance_db[record_id] = record
+    attendance_db[record["id"]] = record
     return jsonify(record), 201
 
 
-@app.route("/attendance/event/<event_id>", methods=["GET"])
+@app.get("/attendance/event/<event_id>")
 def get_event_attendance(event_id):
-    """Список участников и счётчик по конкретному мероприятию."""
+    """Публичный список участников и счётчик по конкретному мероприятию."""
     records = [r for r in attendance_db.values() if r["event_id"] == event_id]
     going_count = len([r for r in records if r["status"] == "going"])
     interested_count = len([r for r in records if r["status"] == "interested"])
@@ -64,12 +131,25 @@ def get_event_attendance(event_id):
     }), 200
 
 
-@app.route("/attendance/user/<user_id>", methods=["GET"])
+@app.get("/attendance/user/<user_id>")
+@require_auth
 def get_user_attendance(user_id):
-    """Список мероприятий, на которые пользователь отметился."""
-    records = [r for r in attendance_db.values() if r["user_id"] == user_id]
+    """Пользователь видит только свои отметки, admin — любые."""
+    actor = current_user()
+    if str(actor["sub"]) != str(user_id) and actor.get("role") != "admin":
+        return error_response(
+            403,
+            "Forbidden",
+            "Просматривать чужие отметки может только администратор",
+            [{"field": "user_id", "message": "недостаточно прав"}],
+        )
+    records = [r for r in attendance_db.values() if r["user_id"] == str(user_id)]
     return jsonify(records), 200
 
 
+register_error_handlers(app)
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5002, debug=True)
+    debug = os.environ.get("FLASK_DEBUG", "0").lower() in {"1", "true", "yes", "on"}
+    app.run(host="0.0.0.0", port=5002, debug=debug)

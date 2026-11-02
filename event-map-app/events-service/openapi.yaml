@@ -4,11 +4,16 @@ info:
   description: |
     REST API сервиса мероприятий (ПР2). Основная сущность — Event.
 
+    Изменение данных защищено JWT Bearer-токеном, который выдаёт users-service:
+    POST/PUT/PATCH/DELETE доступны ролям organizer и admin. Организатор может
+    менять только свои события, admin — любые.
+
     Единый формат ошибок для всех операций:
-        {"error": "<Код>", "details": [{"field": "<поле>", "message": "<описание>"}]}
-    Коды ошибок: ValidationError (400), BadRequest (400), NotFound (404),
+        {"error": {"code": "<Код>", "message": "<описание>", "details": [...]}}
+    Коды ошибок: ValidationError (400), BadRequest (400), Unauthorized (401),
+    InvalidToken/TokenExpired (401), Forbidden (403), NotFound (404),
     MethodNotAllowed (405), InternalServerError (500).
-  version: "1.0.0"
+  version: "4.0.0"
 servers:
   - url: http://localhost:5001
 tags:
@@ -97,6 +102,8 @@ paths:
       tags: [Events]
       summary: Создание нового события
       operationId: createEvent
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -110,6 +117,10 @@ paths:
               schema: { $ref: "#/components/schemas/Event" }
         "400":
           $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /events/{event_id}:
     parameters:
       - name: event_id
@@ -133,6 +144,8 @@ paths:
       tags: [Events]
       summary: Полное обновление события
       operationId: replaceEvent
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -146,12 +159,18 @@ paths:
               schema: { $ref: "#/components/schemas/Event" }
         "400":
           $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
     patch:
       tags: [Events]
       summary: Частичное обновление события
       operationId: patchEvent
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -165,18 +184,34 @@ paths:
               schema: { $ref: "#/components/schemas/Event" }
         "400":
           $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
     delete:
       tags: [Events]
       summary: Удаление события
       operationId: deleteEvent
+      security:
+        - BearerAuth: []
       responses:
         "204":
           description: Событие удалено
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT из POST /auth/login users-service
   responses:
     ValidationError:
       description: Ошибка валидации входных данных
@@ -185,6 +220,16 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
     NotFound:
       description: Ресурс не найден
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Токен отсутствует, истёк или недействителен
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Аутентифицирован, но недостаточно прав (роль или владелец)
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -207,7 +252,8 @@ components:
         updated_at: { type: string, format: date-time, readOnly: true }
     EventCreate:
       type: object
-      required: [title, description, lat, lng, starts_at, category, organizer_id]
+      required: [title, description, lat, lng, starts_at, category]
+      description: organizer_id определяется по JWT; admin может передать явно
       properties:
         title: { type: string, minLength: 2, maxLength: 100 }
         description: { type: string, minLength: 1, maxLength: 2000 }
@@ -229,23 +275,44 @@ components:
         organizer_id: { type: string }
     Error:
       type: object
-      required: [error, details]
+      required: [error]
       properties:
         error:
-          type: string
-          description: Машинный код ошибки
-          enum: [ValidationError, BadRequest, NotFound, MethodNotAllowed, InternalServerError]
-        details:
-          type: array
-          items:
-            type: object
-            properties:
-              field:
-                type: [string, "null"]
-                description: Имя поля; null — ошибка уровня запроса
-              message:
-                type: string
-                description: Человекочитаемое описание
-            example:
-              field: title
+          type: object
+          required: [code, message, details]
+          properties:
+            code:
+              type: string
+              description: Машинный код ошибки
+              enum:
+                - ValidationError
+                - BadRequest
+                - Unauthorized
+                - InvalidToken
+                - TokenExpired
+                - Forbidden
+                - NotFound
+                - MethodNotAllowed
+                - Conflict
+                - InternalServerError
+            message:
+              type: string
+              description: Человекочитаемое описание
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: [string, "null"]
+                    description: Имя поля; null — ошибка уровня запроса
+                  message:
+                    type: string
+                    description: Пояснение по полю
+      example:
+        error:
+          code: ValidationError
+          message: Ошибка валидации
+          details:
+            - field: title
               message: "длина должна быть от 2 до 100 символов"

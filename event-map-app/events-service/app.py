@@ -14,11 +14,13 @@ Events Service — ПР3: реляционная база данных, мигр
 """
 
 import logging
+import os
 
 from flask import Flask, jsonify
 
-from api import events_bp, register_error_handlers
+from api import events_bp
 from database import connect_and_log
+from errors import register_error_handlers
 from services import seed_categories
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
@@ -39,17 +41,22 @@ def create_app():
     def root():
         return jsonify({
             "service": "events-service",
-            "version": "3.0.0",
+            "version": "4.0.0",
             "database": backend,
+            "auth": {
+                "type": "JWT Bearer",
+                "write_roles": ["organizer", "admin"],
+                "note": "организатор меняет только свои события, admin — любые",
+            },
             "endpoints": [
                 {"method": "GET", "path": "/"},
                 {"method": "GET", "path": "/health"},
                 {"method": "GET", "path": "/events"},
-                {"method": "POST", "path": "/events"},
+                {"method": "POST", "path": "/events", "auth": True},
                 {"method": "GET", "path": "/events/{id}"},
-                {"method": "PUT", "path": "/events/{id}"},
-                {"method": "PATCH", "path": "/events/{id}"},
-                {"method": "DELETE", "path": "/events/{id}"},
+                {"method": "PUT", "path": "/events/{id}", "auth": True},
+                {"method": "PATCH", "path": "/events/{id}", "auth": True},
+                {"method": "DELETE", "path": "/events/{id}", "auth": True},
             ],
         }), 200
 
@@ -64,4 +71,5 @@ def create_app():
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    debug = os.environ.get("FLASK_DEBUG", "0").lower() in {"1", "true", "yes", "on"}
+    app.run(host="0.0.0.0", port=5001, debug=debug)

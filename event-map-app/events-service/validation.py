@@ -7,7 +7,7 @@
     [{"field": "title", "message": "длина от 2 до 100 символов"}, ...]
 
 Маршруты оборачивают её в единый формат ответа:
-    {"error": "ValidationError", "details": [...]}
+    {"error": {"code": "ValidationError", "message": "...", "details": [...]}}
 """
 
 from datetime import datetime
@@ -31,8 +31,11 @@ REQUIRED_FIELDS = [
     "lng",
     "starts_at",
     "category",
-    "organizer_id",
 ]
+
+# organizer_id принимается для совместимости, но для не-администратора
+# всегда переопределяется идентификатором из JWT.
+OPTIONAL_FIELDS = ["organizer_id"]
 
 
 def validate_event(data, partial=False):
@@ -59,7 +62,7 @@ def validate_event(data, partial=False):
             return [{"field": None, "message": "пустое тело: укажите хотя бы одно поле для обновления"}]
 
     for field in data:
-        if field not in REQUIRED_FIELDS + ["id", "created_at", "updated_at"]:
+        if field not in REQUIRED_FIELDS + OPTIONAL_FIELDS + ["id", "created_at", "updated_at"]:
             details.append({"field": field, "message": "неизвестное поле"})
             continue
         value = data[field]

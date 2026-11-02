@@ -7,20 +7,47 @@
 """
 
 from database import db_session, from_iso, to_iso, utcnow
+from errors import ApiError
 from models import Event
 from repository.categories import CategoryRepository
 from repository.events import EventRepository
 from validation import validate_event, validate_query_params, CATEGORIES
 
 
-class EventNotFoundError(Exception):
-    pass
+class EventNotFoundError(ApiError):
+    def __init__(self, event_id):
+        super().__init__(
+            404,
+            "NotFound",
+            "Мероприятие не найдено",
+            [{"field": "id", "message": f"событие {event_id} не найдено"}],
+        )
 
 
-class ValidationFailedError(Exception):
+class ValidationFailedError(ApiError):
     def __init__(self, details):
-        super().__init__("validation failed")
-        self.details = details
+        super().__init__(400, "ValidationError", "Ошибка валидации", details)
+
+
+class ForbiddenError(ApiError):
+    def __init__(self, message="Недостаточно прав для выполнения операции"):
+        super().__init__(
+            403,
+            "Forbidden",
+            message,
+            [{"field": "organizer_id", "message": message}],
+        )
+
+
+def _is_admin(actor):
+    return actor.get("role") == "admin"
+
+
+def _authorize_event(event, actor):
+    if _is_admin(actor):
+        return
+    if event.organizer_id != str(actor.get("sub")):
+        raise ForbiddenError("Изменять мероприятие может только владелец или администратор")
 
 
 def _serialize(event):
@@ -79,10 +106,15 @@ class EventsService:
             return _serialize(event)
 
     # ---- создание ----
-    def create(self, payload):
+    def create(self, payload, actor):
         details = validate_event(payload)
         if details:
             raise ValidationFailedError(details)
+
+        if _is_admin(actor):
+            organizer_id = (payload.get("organizer_id") or "").strip() or str(actor["sub"])
+        else:
+            organizer_id = str(actor["sub"])
 
         with db_session() as session:
             category = CategoryRepository(session).get_or_create(payload["category"])
@@ -93,7 +125,7 @@ class EventsService:
                 lng=float(payload["lng"]),
                 starts_at=from_iso(payload["starts_at"]),
                 category_id=category.id,
-                organizer_id=payload["organizer_id"].strip(),
+                organizer_id=organizer_id,
                 created_at=utcnow(),
                 updated_at=utcnow(),
             )
@@ -102,16 +134,25 @@ class EventsService:
             return _serialize(event)
 
     # ---- полное обновление (PUT) ----
-    def replace(self, event_id, payload):
+    def replace(self, event_id, payload, actor):
         with db_session() as session:
             repo = EventRepository(session)
             event = repo.get(event_id)
             if event is None:
                 raise EventNotFoundError(event_id)
+            _authorize_event(event, actor)
 
             details = validate_event(payload)
             if details:
                 raise ValidationFailedError(details)
+
+            if _is_admin(actor):
+                organizer_id = (
+                    (payload.get("organizer_id") or "").strip()
+                    or event.organizer_id
+                )
+            else:
+                organizer_id = str(actor["sub"])
 
             category = CategoryRepository(session).get_or_create(payload["category"])
             event.title = payload["title"].strip()
@@ -120,17 +161,18 @@ class EventsService:
             event.lng = float(payload["lng"])
             event.starts_at = from_iso(payload["starts_at"])
             event.category_id = category.id
-            event.organizer_id = payload["organizer_id"].strip()
+            event.organizer_id = organizer_id
             event.updated_at = utcnow()
             return _serialize(event)
 
     # ---- частичное обновление (PATCH) ----
-    def patch(self, event_id, patch):
+    def patch(self, event_id, patch, actor):
         with db_session() as session:
             repo = EventRepository(session)
             event = repo.get(event_id)
             if event is None:
                 raise EventNotFoundError(event_id)
+            _authorize_event(event, actor)
 
             details = validate_event(patch, partial=True)
             if details:
@@ -140,6 +182,9 @@ class EventsService:
                 if field == "category":
                     category = CategoryRepository(session).get_or_create(value)
                     event.category_id = category.id
+                elif field == "organizer_id":
+                    if _is_admin(actor):
+                        event.organizer_id = value.strip()
                 elif field in ("lat", "lng"):
                     setattr(event, field, float(value))
                 elif field == "starts_at":
@@ -150,11 +195,14 @@ class EventsService:
             return _serialize(event)
 
     # ---- удаление ----
-    def delete(self, event_id):
+    def delete(self, event_id, actor):
         with db_session() as session:
-            removed = EventRepository(session).remove(event_id)
-            if not removed:
+            repo = EventRepository(session)
+            event = repo.get(event_id)
+            if event is None:
                 raise EventNotFoundError(event_id)
+            _authorize_event(event, actor)
+            repo.remove(event_id)
 
 
 def seed_categories():
