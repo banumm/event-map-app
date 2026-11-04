@@ -13,3 +13,4 @@ venv/
 .coverage-data/
 htmlcov/
 .pytest_cache/
+~$*
