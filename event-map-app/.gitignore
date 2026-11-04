@@ -8,3 +8,8 @@ venv/
 .venv/
 *.egg-info/
 .DS_Store
+.coverage
+.coverage.*
+.coverage-data/
+htmlcov/
+.pytest_cache/

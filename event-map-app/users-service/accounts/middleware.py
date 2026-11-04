@@ -30,6 +30,7 @@ class UnifiedErrorMiddleware:
                 exception.code,
                 exception.message,
                 exception.details,
+                headers=exception.headers,
             )
         if isinstance(exception, Http404):
             return error_response(404)
@@ -56,7 +57,8 @@ class UnifiedErrorMiddleware:
             response = self.get_response(request)
         except ApiError as exc:
             return error_response(
-                exc.status, exc.code, exc.message, exc.details
+                exc.status, exc.code, exc.message, exc.details,
+                headers=exc.headers,
             )
         except Http404:
             return error_response(404)

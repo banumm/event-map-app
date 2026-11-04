@@ -94,6 +94,10 @@ JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
 JWT_ISSUER = os.environ.get("JWT_ISSUER", "event-map-users-service")
 JWT_EXPIRES_MINUTES = int(os.environ.get("JWT_EXPIRES_MINUTES", "60"))
 
+# Ограничение частоты запросов на /auth/login и /auth/register.
+AUTH_RATE_LIMIT = int(os.environ.get("AUTH_RATE_LIMIT", "10"))
+AUTH_RATE_WINDOW_SECONDS = int(os.environ.get("AUTH_RATE_WINDOW_SECONDS", "60"))
+
 LANGUAGE_CODE = "ru"
 TIME_ZONE = "Asia/Almaty"
 USE_I18N = True

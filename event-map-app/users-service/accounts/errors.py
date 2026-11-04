@@ -19,6 +19,7 @@ STATUS_META = {
     404: ("NotFound", "Ресурс не найден"),
     405: ("MethodNotAllowed", "Метод не поддерживается"),
     409: ("Conflict", "Конфликт данных"),
+    429: ("TooManyRequests", "Слишком много запросов"),
     500: ("InternalServerError", "Внутренняя ошибка сервера"),
 }
 
@@ -26,12 +27,13 @@ STATUS_META = {
 class ApiError(Exception):
     """Исключение с явным HTTP-статусом и машинным кодом ошибки."""
 
-    def __init__(self, status, code, message, details=None):
+    def __init__(self, status, code, message, details=None, headers=None):
         super().__init__(message)
         self.status = status
         self.code = code
         self.message = message
         self.details = details or []
+        self.headers = headers or {}
 
 
 def error_payload(code, message, details=None):

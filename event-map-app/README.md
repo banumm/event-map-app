@@ -65,6 +65,25 @@ Django-сессии оставлены только для админ-панел
 истечения срока не поддерживается (в токене есть `jti`, при необходимости можно
 добавить blacklist).
 
+## ПР5: автоматизированные тесты и безопасность API
+
+- **72 теста**: 28 в users-service (Django `TestCase`/`SimpleTestCase`), 28 в
+  events-service и 16 в attendance-service (pytest + Flask test client).
+- **Покрытие ≈85%** по трём сервисам: users-service — 88%, events-service — 82%,
+  attendance-service — 93%. Отчёт и комментарий по слабым местам —
+  [docs/testing.md](docs/testing.md).
+- **Изоляция тестов**: отдельная тестовая БД Django, отдельный `test_events.db`
+  с миграциями Alembic и очисткой таблиц, очистка in-memory attendance-хранилища.
+- **Проверка безопасности**: чек-лист в [docs/testing.md](docs/testing.md#4-чек-лист-проверки-безопасности-api)
+  — ORM вместо конкатенации SQL, отсутствие хэша пароля в ответах, корректные
+  401/403, mass assignment, валидация, stack trace.
+- **Найдено и исправлено**: на `/auth/login` и `/auth/register` не было
+  ограничения частоты запросов. Добавлен in-memory rate limiter
+  (`accounts/ratelimit.py`, 10 запросов за 60 секунд на IP, `429` + `Retry-After`).
+  Дополнительно тесты выявили и закрыли дефект: после `PATCH`/`PUT` категория
+  события возвращалась старая.
+- Подробно: [docs/testing.md](docs/testing.md).
+
 ## СРС №1: презентация
 
 - [СРС1_Фамилия_Имя_Группа.pptx](docs/srs1/СРС1_Фамилия_Имя_Группа.pptx) — 17 слайдов, 16:9.
@@ -135,30 +154,60 @@ python verify.py
 | GET | `/attendance/event/{id}` | публично |
 | GET | `/attendance/user/{id}` | сам пользователь или admin |
 
-## Тесты
+## Тестирование
+
+Установить тестовые зависимости и запустить все наборы с отчётом о покрытии:
+
+```bash
+python -m pip install -r requirements-dev.txt
+python scripts/run_tests.py
+```
+
+Или по отдельности:
 
 ```bash
 cd users-service
 python manage.py test
 
 cd events-service
-python verify.py
+python -m pytest -q
 
 cd attendance-service
-python verify.py
+python -m pytest -q
 ```
+
+Покрытие по сервисам (подробнее — [docs/testing.md](docs/testing.md)):
+
+| Сервис | Тестов | Покрытие |
+|---|---:|---:|
+| users-service | 28 | 88% |
+| events-service | 28 | 82% |
+| attendance-service | 16 | 93% |
+| **Итого** | **72** | **≈85%** |
+
+Тесты изолированы: Django создаёт отдельную тестовую БД и откатывает
+транзакции; events-service использует `test_events.db`, миграции Alembic и
+очистку таблиц перед каждым тестом; attendance-service очищает in-memory
+хранилище. Рабочие данные не затрагиваются.
+
+Чек-лист безопасности API и описание исправленной проблемы (rate limiting) —
+в [docs/testing.md](docs/testing.md#4-чек-лист-проверки-безопасности-api).
 
 ## Структура репозитория
 
 ```
 event-map-app/
 ├── README.md
+├── requirements-dev.txt     ← pytest + coverage
+├── scripts/
+│   └── run_tests.py         ← все тесты + отчёт coverage
 ├── docs/
 │   ├── requirements.md      ← user stories
 │   ├── architecture.svg
 │   ├── auth.md              ← ПР4: модель, JWT, роли, ошибки
 │   ├── auth-check.md        ← ПР4: протокол проверки доступа
-│   ├── security.md          ← СРС1: OWASP API Top 10
+│   ├── testing.md           ← ПР5: тесты, покрытие, чек-лист безопасности
+│   ├── security.md          ← OWASP API Top 10
 │   └── srs1/                ← СРС1: PPTX, PDF, диаграммы, генератор
 ├── events-service/
 │   ├── app.py               ← точка входа
@@ -170,18 +219,22 @@ event-map-app/
 │   ├── models.py, database.py, repository/
 │   ├── alembic/versions/    ← миграции
 │   ├── openapi.yaml         ← контракт REST API
-│   ├── verify.py            ← автотест CRUD + auth
+│   ├── tests/               ← pytest: unit + API
+│   ├── verify.py            ← сквозной автотест CRUD + auth
 │   └── docs/                ← api.md, examples.http, db_schema.md
 ├── attendance-service/
 │   ├── app.py               ← защита JWT
-│   ├── auth.py, errors.py
+│   ├── auth.py, errors.py, validation.py
+│   ├── tests/               ← pytest: unit + API
 │   └── verify.py
 └── users-service/
     ├── manage.py
     ├── config/              ← settings, urls
     ├── accounts/            ← модель User, JWT, views, errors, middleware
+    │   ├── auth.py, ratelimit.py
     │   ├── migrations/0001_initial.py
     │   ├── management/commands/create_admin.py
-    │   └── tests.py
+    │   ├── tests.py         ← API-тесты
+    │   └── tests_unit.py    ← unit-тесты
     └── requirements.txt
 ```

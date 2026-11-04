@@ -1,0 +1,5 @@
+# Зависимости для тестов и отчёта о покрытии (ПР5).
+# Устанавливаются поверх requirements.txt каждого сервиса:
+#   python -m pip install -r requirements-dev.txt
+pytest==9.2.0
+coverage==7.17.1

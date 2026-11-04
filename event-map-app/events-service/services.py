@@ -160,7 +160,7 @@ class EventsService:
             event.lat = float(payload["lat"])
             event.lng = float(payload["lng"])
             event.starts_at = from_iso(payload["starts_at"])
-            event.category_id = category.id
+            event.category = category
             event.organizer_id = organizer_id
             event.updated_at = utcnow()
             return _serialize(event)
@@ -181,7 +181,7 @@ class EventsService:
             for field, value in patch.items():
                 if field == "category":
                     category = CategoryRepository(session).get_or_create(value)
-                    event.category_id = category.id
+                    event.category = category
                 elif field == "organizer_id":
                     if _is_admin(actor):
                         event.organizer_id = value.strip()

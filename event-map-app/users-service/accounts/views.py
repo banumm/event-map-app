@@ -14,6 +14,7 @@ from django.views.decorators.http import require_http_methods
 
 from .auth import create_access_token, require_auth, require_role
 from .errors import ApiError
+from .ratelimit import rate_limit
 
 User = get_user_model()
 
@@ -107,6 +108,7 @@ def health(request):
 
 @csrf_exempt
 @require_http_methods(["POST"])
+@rate_limit("register")
 def register(request):
     """Регистрация пользователя. Пароль сразу сохраняется только в виде хэша."""
     data = _json_body(request)
@@ -147,6 +149,7 @@ def register(request):
 
 @csrf_exempt
 @require_http_methods(["POST"])
+@rate_limit("login")
 def login_view(request):
     """Проверяет логин/пароль (username или email) и выдаёт JWT."""
     data = _json_body(request)

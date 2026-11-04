@@ -3,14 +3,17 @@ import json
 import jwt
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 
 from .middleware import UnifiedErrorMiddleware
+from .ratelimit import reset_limiter
 
 User = get_user_model()
 
 
 class AuthApiTests(TestCase):
+    def setUp(self):
+        reset_limiter()
     def post(self, path, payload):
         return self.client.post(
             path,
@@ -140,6 +143,44 @@ class AuthApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"]["code"], "BadRequest")
+
+    def test_register_and_login_do_not_return_password_hash(self):
+        response = self.register()
+        self.assertEqual(response.status_code, 201)
+        self.assertNotIn("password", response.json())
+        self.assertNotIn("argon2", response.content.decode())
+
+        response = self.login()
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("password", response.json()["user"])
+        self.assertNotIn("argon2", response.content.decode())
+
+    def test_invalid_token_returns_401(self):
+        response = self.client.get(
+            "/auth/me",
+            HTTP_AUTHORIZATION="Bearer not-a-jwt",
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["error"]["code"], "InvalidToken")
+
+    @override_settings(AUTH_RATE_LIMIT=2, AUTH_RATE_WINDOW_SECONDS=60)
+    def test_register_rate_limit_returns_429(self):
+        reset_limiter()
+        self.register()
+        self.register(email="other@example.com")
+        response = self.register(username="third", email="third@example.com")
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.json()["error"]["code"], "TooManyRequests")
+        self.assertIn("Retry-After", response)
+
+    @override_settings(AUTH_RATE_LIMIT=1, AUTH_RATE_WINDOW_SECONDS=60)
+    def test_login_rate_limit_returns_429(self):
+        reset_limiter()
+        self.register()
+        self.assertEqual(self.login().status_code, 200)
+        response = self.login()
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.json()["error"]["code"], "TooManyRequests")
 
     def test_unhandled_exception_returns_unified_500(self):
         request = RequestFactory().get("/boom")

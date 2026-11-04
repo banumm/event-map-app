@@ -16,12 +16,11 @@ from flask import Flask, jsonify, request
 
 from auth import current_user, require_auth
 from errors import ApiError, error_response, register_error_handlers
+from validation import validate_attendance_payload
 
 app = Flask(__name__)
 
 attendance_db = {}
-
-ALLOWED_STATUSES = {"going", "interested", "cancelled"}
 
 
 def _json_body():
@@ -65,33 +64,13 @@ def mark_attendance():
     data = _json_body()
     actor = current_user()
 
-    required_fields = ["event_id", "status"]
-    missing = [f for f in required_fields if f not in data]
-    if missing:
+    details = validate_attendance_payload(data)
+    if details:
         raise ApiError(
             400,
             "ValidationError",
             "Ошибка валидации",
-            [{"field": f, "message": "обязательное поле отсутствует"} for f in missing],
-        )
-
-    if not isinstance(data["event_id"], str) or not data["event_id"].strip():
-        raise ApiError(
-            400,
-            "ValidationError",
-            "Ошибка валидации",
-            [{"field": "event_id", "message": "должно быть непустой строкой"}],
-        )
-
-    if data["status"] not in ALLOWED_STATUSES:
-        raise ApiError(
-            400,
-            "ValidationError",
-            "Ошибка валидации",
-            [{
-                "field": "status",
-                "message": f"допустимые значения: {', '.join(sorted(ALLOWED_STATUSES))}",
-            }],
+            details,
         )
 
     user_id = str(actor["sub"])
