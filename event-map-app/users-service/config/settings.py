@@ -11,6 +11,7 @@ events-service и attendance-service.
 
 import os
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 from dotenv import load_dotenv
 
@@ -44,6 +45,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # Первым: видит итоговый статус ответа, в т.ч. сформированный обработчиком ошибок.
+    "accounts.observability.ObservabilityMiddleware",
     "accounts.middleware.UnifiedErrorMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -73,12 +76,33 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+def _database_from_url(url):
+    """
+    DATABASE_URL → настройки Django (ПР7). Поддерживаются:
+        postgresql://user:password@host:5432/dbname
+        sqlite:///absolute/path.db   (или пусто — локальный db.sqlite3)
+    """
+    if not url or url.startswith("sqlite"):
+        path = url.split("sqlite:///", 1)[1] if url and "sqlite:///" in url else ""
+        return {"ENGINE": "django.db.backends.sqlite3", "NAME": path or BASE_DIR / "db.sqlite3"}
+    parsed = urlparse(url)
+    if parsed.scheme not in {"postgres", "postgresql", "postgresql+psycopg2"}:
+        raise ValueError(f"Неподдерживаемая схема DATABASE_URL: {parsed.scheme}")
+    return {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": parsed.path.lstrip("/"),
+        "USER": unquote(parsed.username or ""),
+        "PASSWORD": unquote(parsed.password or ""),
+        "HOST": parsed.hostname or "",
+        "PORT": str(parsed.port or 5432),
+        # Явный тайм-аут: /health и запросы не зависают при остановленной БД.
+        "OPTIONS": {"connect_timeout": int(os.environ.get("DB_CONNECT_TIMEOUT_SECONDS", "3"))},
+        "CONN_MAX_AGE": 60,
+        "CONN_HEALTH_CHECKS": True,
     }
-}
+
+
+DATABASES = {"default": _database_from_url(os.environ.get("DATABASE_URL", ""))}
 
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.Argon2PasswordHasher",
@@ -104,5 +128,21 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Структурированные логи в stdout (ПР7): одна JSON-строка на событие.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"json": {"()": "accounts.observability.JsonFormatter"}},
+    "handlers": {"stdout": {"class": "logging.StreamHandler", "formatter": "json"}},
+    "root": {"handlers": ["stdout"], "level": os.environ.get("LOG_LEVEL", "INFO")},
+    "loggers": {
+        # access-лог пишет ObservabilityMiddleware; стандартный django.server/request
+        # оставляем только для предупреждений и ошибок.
+        "django.server": {"level": "WARNING"},
+        "django.request": {"level": "ERROR"},
+    },
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

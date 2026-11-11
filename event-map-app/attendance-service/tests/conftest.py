@@ -12,6 +12,9 @@ sys.path.insert(0, str(SERVICE_ROOT))
 os.environ.setdefault("JWT_SECRET", "test-jwt-secret")
 os.environ.setdefault("JWT_ALGORITHM", "HS256")
 os.environ.setdefault("JWT_ISSUER", "event-map-users-service")
+# Интеграция с events-service в тестах по умолчанию выключена;
+# отдельные тесты включают её через monkeypatch.
+os.environ.pop("EVENTS_SERVICE_URL", None)
 
 from app import app as flask_app, attendance_db  # noqa: E402
 

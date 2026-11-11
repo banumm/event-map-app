@@ -1,0 +1,8 @@
+# Конфигурация линтера (ПР7, CI).
+target-version = "py312"
+line-length = 100
+extend-exclude = ["docs", "**/migrations/*.py"]
+
+[lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]

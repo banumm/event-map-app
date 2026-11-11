@@ -11,22 +11,44 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
+
+from observability import metrics
 
 load_dotenv()
 
 DEFAULT_DATABASE_URL = "sqlite:///./events.db"
 DATABASE_URL = os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
 
+DB_CONNECT_TIMEOUT = int(os.environ.get("DB_CONNECT_TIMEOUT_SECONDS", "3"))
+
+
+def _connect_args(url):
+    if url.startswith("sqlite"):
+        return {"check_same_thread": False}
+    if url.startswith("postgresql"):
+        # Явный тайм-аут: при остановленной БД запрос и /health не зависают.
+        return {"connect_timeout": DB_CONNECT_TIMEOUT}
+    return {}
+
+
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+    connect_args=_connect_args(DATABASE_URL),
+    # Проверка соединения перед выдачей из пула: после перезапуска БД
+    # «мёртвые» соединения отбрасываются, а не приводят к ошибке запроса.
+    pool_pre_ping=True,
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
+@event.listens_for(engine, "before_cursor_execute")
+def _count_queries(conn, cursor, statement, parameters, context, executemany):
+    # Метрика db_queries_total доказывает, что попадание в кэш не идёт в БД.
+    metrics.inc("db_queries_total", help_text="SQL-запросы к базе данных")
+
+
 if engine.url.get_backend_name() == "sqlite":
-    from sqlalchemy import event
 
     @event.listens_for(engine, "connect")
     def _enable_sqlite_fk(dbapi_connection, connection_record):
@@ -84,3 +106,13 @@ def connect_and_log():
     backend = engine.url.get_backend_name()
     url = engine.url.render_as_string(hide_password=True)
     return backend, url
+
+
+def check_database():
+    """Проверка доступности БД для /health: (ok, текст ошибки или None)."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True, None
+    except Exception as exc:  # noqa: BLE001 — /health не должен падать
+        return False, str(getattr(exc, "orig", None) or exc).splitlines()[0][:200]

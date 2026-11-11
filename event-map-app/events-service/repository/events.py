@@ -3,7 +3,6 @@
 и поиск по фильтрам. Никаких правил валидации и HTTP — это зона services/api.
 """
 
-from datetime import datetime
 
 from models import Event
 from sqlalchemy import func, select

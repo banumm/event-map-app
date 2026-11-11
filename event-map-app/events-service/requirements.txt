@@ -4,5 +4,7 @@ Alembic==1.20.0
 PyYAML==6.0.2
 PyJWT==2.10.1
 python-dotenv==1.1.1
-# PostgreSQL драйвер (только если используете PostgreSQL):
-# psycopg2-binary==2.9.10
+# PostgreSQL драйвер (docker compose, ПР7):
+psycopg2-binary==2.9.10
+# Production WSGI-сервер (ПР7):
+gunicorn==23.0.0

@@ -8,17 +8,27 @@ Attendance Service
 отмечать только себя, администратор — любого пользователя.
 """
 
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
 
 from flask import Flask, jsonify, request
 
+import events_client
+import observability
 from auth import current_user, require_auth
 from errors import ApiError, error_response, register_error_handlers
 from validation import validate_attendance_payload
 
+SERVICE_NAME = "attendance-service"
+VERSION = "5.0.0"
+
+observability.configure_logging(SERVICE_NAME, os.environ.get("LOG_LEVEL", "INFO"))
+logger = logging.getLogger(SERVICE_NAME)
+
 app = Flask(__name__)
+observability.init_app(app, SERVICE_NAME)
 
 attendance_db = {}
 
@@ -38,13 +48,14 @@ def _json_body():
 def root():
     return jsonify({
         "service": "attendance-service",
-        "version": "4.0.0",
+        "version": VERSION,
         "auth": {
             "type": "JWT Bearer",
             "note": "пользователь отмечает только себя, admin — любого",
         },
         "endpoints": [
             {"method": "GET", "path": "/health"},
+            {"method": "GET", "path": "/metrics"},
             {"method": "POST", "path": "/attendance", "auth": True},
             {"method": "GET", "path": "/attendance/event/{event_id}"},
             {"method": "GET", "path": "/attendance/user/{user_id}", "auth": True},
@@ -54,7 +65,25 @@ def root():
 
 @app.get("/health")
 def health():
-    return jsonify({"status": "ok", "service": "attendance-service"}), 200
+    """Состояние сервиса и его зависимости — events-service (ПР7)."""
+    checks = {"storage": {"status": "ok", "type": "in-memory"}}
+    status_code = 200
+    if events_client.is_enabled():
+        ok, error = events_client.check_health()
+        checks["events_service"] = {"status": "ok" if ok else "error"}
+        if not ok:
+            checks["events_service"]["error"] = error
+            status_code = 503
+            logger.warning("health check failed",
+                           extra={"event": "health.fail", "dependency": "events-service"})
+    else:
+        checks["events_service"] = {"status": "disabled"}
+    return jsonify({
+        "status": "ok" if status_code == 200 else "degraded",
+        "service": SERVICE_NAME,
+        "version": VERSION,
+        "checks": checks,
+    }), status_code
 
 
 @app.post("/attendance")
@@ -85,6 +114,8 @@ def mark_attendance():
             )
         user_id = str(requested_user_id)
 
+    _ensure_event_exists(data["event_id"])
+
     record = {
         "id": str(uuid.uuid4()),
         "user_id": user_id,
@@ -93,7 +124,33 @@ def mark_attendance():
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     attendance_db[record["id"]] = record
+    logger.info("attendance marked", extra={
+        "event": "attendance.created", "event_id": record["event_id"],
+        "user_id": user_id, "status": record["status"],
+    })
     return jsonify(record), 201
+
+
+def _ensure_event_exists(event_id):
+    """Проверка события в events-service (если интеграция включена)."""
+    if not events_client.is_enabled():
+        return
+    try:
+        exists = events_client.event_exists(event_id)
+    except events_client.EventsServiceUnavailable as exc:
+        raise ApiError(
+            503,
+            "ServiceUnavailable",
+            "Сервис мероприятий недоступен, повторите попытку позже",
+            [{"field": "event_id", "message": str(exc)}],
+        ) from exc
+    if not exists:
+        raise ApiError(
+            404,
+            "NotFound",
+            "Мероприятие не найдено",
+            [{"field": "event_id", "message": f"событие {event_id} не найдено"}],
+        )
 
 
 @app.get("/attendance/event/<event_id>")
@@ -131,4 +188,4 @@ register_error_handlers(app)
 
 if __name__ == "__main__":
     debug = os.environ.get("FLASK_DEBUG", "0").lower() in {"1", "true", "yes", "on"}
-    app.run(host="0.0.0.0", port=5002, debug=debug)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5002")), debug=debug)

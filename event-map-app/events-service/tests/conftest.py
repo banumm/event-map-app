@@ -24,6 +24,8 @@ os.environ["DATABASE_URL"] = f"sqlite:///{DB_PATH}"
 os.environ["JWT_SECRET"] = "test-jwt-secret"
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_ISSUER"] = "event-map-users-service"
+os.environ["EVENTS_CACHE_TTL_SECONDS"] = "60"
+os.environ["EVENTS_CACHE_STALE_SECONDS"] = "300"
 
 subprocess.run(
     [sys.executable, "-m", "alembic", "upgrade", "head"],
@@ -35,6 +37,7 @@ subprocess.run(
 from sqlalchemy import delete  # noqa: E402
 
 from app import app as flask_app  # noqa: E402
+from cache import events_cache  # noqa: E402
 from database import db_session  # noqa: E402
 from models import Event, EventParticipant  # noqa: E402
 
@@ -55,4 +58,6 @@ def clean_database():
     with db_session() as session:
         session.execute(delete(EventParticipant))
         session.execute(delete(Event))
+    # Таблицы очищаются в обход сервиса — кэш тоже сбрасываем вручную.
+    events_cache.clear()
     yield
