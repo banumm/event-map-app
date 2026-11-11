@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 
 from django.conf import settings
@@ -6,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import update_last_login
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Q
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -17,6 +18,7 @@ from .errors import ApiError
 from .ratelimit import rate_limit
 
 User = get_user_model()
+logger = logging.getLogger("users-service")
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,150}$")
 PUBLIC_ROLES = {User.ROLE_USER, User.ROLE_ORGANIZER}
@@ -103,7 +105,24 @@ def _validate_registration(data):
 
 @require_http_methods(["GET"])
 def health(request):
-    return JsonResponse({"status": "ok", "service": "users-service"})
+    """Процесс жив И база данных отвечает; иначе 503 (ПР7)."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        database = {"status": "ok", "backend": connection.vendor}
+        status_code = 200
+    except Exception as exc:  # noqa: BLE001 — /health не должен падать
+        database = {"status": "error", "error": str(exc).splitlines()[0][:200] if str(exc) else type(exc).__name__}
+        status_code = 503
+        logger.warning("health check failed", extra={"event": "health.fail", "dependency": "database"})
+    return JsonResponse(
+        {
+            "status": "ok" if status_code == 200 else "unavailable",
+            "service": "users-service",
+            "checks": {"database": database},
+        },
+        status=status_code,
+    )
 
 
 @csrf_exempt

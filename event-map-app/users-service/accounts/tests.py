@@ -194,3 +194,33 @@ class AuthApiTests(TestCase):
         self.assertEqual(response.status_code, 500)
         self.assertEqual(payload["error"]["code"], "InternalServerError")
         self.assertNotIn("boom", response.content.decode())
+
+
+class HealthAndMetricsTests(TestCase):
+    """ПР7: /health отражает состояние БД, /metrics и X-Request-ID."""
+
+    def test_health_ok_when_database_available(self):
+        response = self.client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "ok")
+        self.assertEqual(body["checks"]["database"]["status"], "ok")
+
+    def test_health_503_when_database_unavailable(self):
+        from unittest import mock
+
+        from django.db import OperationalError
+
+        with mock.patch("accounts.views.connection") as fake_connection:
+            fake_connection.cursor.side_effect = OperationalError("connection refused")
+            response = self.client.get("/health")
+        self.assertEqual(response.status_code, 503)
+        body = response.json()
+        self.assertEqual(body["status"], "unavailable")
+        self.assertEqual(body["checks"]["database"]["status"], "error")
+
+    def test_metrics_and_request_id(self):
+        response = self.client.get("/health", HTTP_X_REQUEST_ID="demo-42")
+        self.assertEqual(response["X-Request-ID"], "demo-42")
+        metrics = self.client.get("/metrics").content.decode()
+        self.assertIn('http_requests_total{method="GET",path="/health",status="200"}', metrics)

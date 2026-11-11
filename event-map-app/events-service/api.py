@@ -4,6 +4,9 @@
 Только маршрутизация, разбор query-параметров и JSON-тела + статус-коды.
 Все бизнес-правила и проверки — внутри EventsService.
 
+GET /events и GET /events/{id} кэшируются (ПР6): статус кэша возвращается
+в заголовке X-Cache (HIT / MISS / STALE / BYPASS).
+
 Изменение данных защищено JWT: требуется роль organizer или admin;
 организатор может менять только свои мероприятия, admin — любые.
 """
@@ -23,14 +26,14 @@ WRITE_ROLES = ("organizer", "admin")
 
 @events_bp.get("/events")
 def list_events():
-    result = service.list(
+    result, cache_status = service.list(
         page=parse_query_int("page", request.args.get("page")),
         limit=parse_query_int("limit", request.args.get("limit")),
         category=request.args.get("category"),
         date_from=request.args.get("date_from"),
         date_to=request.args.get("date_to"),
     )
-    return jsonify(result), 200
+    return jsonify(result), 200, {"X-Cache": cache_status}
 
 
 @events_bp.post("/events")
@@ -44,8 +47,8 @@ def create_event():
 
 @events_bp.get("/events/<event_id>")
 def get_event(event_id):
-    event = service.get(event_id)
-    return jsonify(event), 200
+    event, cache_status = service.get(event_id)
+    return jsonify(event), 200, {"X-Cache": cache_status}
 
 
 @events_bp.put("/events/<event_id>")

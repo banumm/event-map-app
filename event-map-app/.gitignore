@@ -14,3 +14,4 @@ venv/
 htmlcov/
 .pytest_cache/
 ~$*
+staticfiles/

@@ -1,9 +1,11 @@
 from django.urls import path
 
 from . import views
+from .observability import metrics_view
 
 urlpatterns = [
     path("health", views.health, name="health"),
+    path("metrics", metrics_view, name="metrics"),
     path("auth/register", views.register, name="register"),
     path("auth/login", views.login_view, name="login"),
     path("auth/me", views.me, name="me"),

@@ -1,0 +1,106 @@
+# Event Map — вся система одной командой (ПР7):
+#   cp .env.example .env   # и заполнить значения
+#   docker compose up -d --build
+#
+# Секреты здесь не хранятся: значения подставляются из .env (он в .gitignore).
+# Сервисы обращаются друг к другу по имени сервиса в общей сети, не по localhost.
+
+name: event-map
+
+x-app-common: &app-common
+  restart: unless-stopped
+  networks: [backend]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?задайте POSTGRES_USER в .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env}
+      POSTGRES_DB: events_db
+      USERS_DB_NAME: users_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data           # именованный том: данные переживают перезапуск
+      - ./docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/10-init-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d events_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [backend]
+
+  users-service:
+    <<: *app-common
+    build: ./users-service
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/users_db
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?задайте DJANGO_SECRET_KEY в .env}
+      DJANGO_DEBUG: "0"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,users-service
+      DJANGO_ADMIN_USERNAME: ${DJANGO_ADMIN_USERNAME:-}
+      DJANGO_ADMIN_EMAIL: ${DJANGO_ADMIN_EMAIL:-}
+      DJANGO_ADMIN_PASSWORD: ${DJANGO_ADMIN_PASSWORD:-}
+      JWT_SECRET: ${JWT_SECRET:?задайте JWT_SECRET в .env}
+      JWT_ISSUER: event-map-users-service
+      JWT_EXPIRES_MINUTES: ${JWT_EXPIRES_MINUTES:-60}
+      AUTH_RATE_LIMIT: ${AUTH_RATE_LIMIT:-10}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports: ["8000:8000"]
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  events-service:
+    <<: *app-common
+    build: ./events-service
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/events_db
+      JWT_SECRET: ${JWT_SECRET:?задайте JWT_SECRET в .env}
+      JWT_ISSUER: event-map-users-service
+      EVENTS_CACHE_TTL_SECONDS: ${EVENTS_CACHE_TTL_SECONDS:-60}
+      EVENTS_CACHE_STALE_SECONDS: ${EVENTS_CACHE_STALE_SECONDS:-300}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports: ["5001:5001"]
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5001/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  attendance-service:
+    <<: *app-common
+    build: ./attendance-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?задайте JWT_SECRET в .env}
+      JWT_ISSUER: event-map-users-service
+      EVENTS_SERVICE_URL: http://events-service:5001
+      EVENTS_SERVICE_TIMEOUT_SECONDS: ${EVENTS_SERVICE_TIMEOUT_SECONDS:-2}
+      EVENTS_SERVICE_RETRIES: ${EVENTS_SERVICE_RETRIES:-2}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports: ["5002:5002"]
+    depends_on:
+      events-service: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5002/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  pgdata:
+
+networks:
+  backend:

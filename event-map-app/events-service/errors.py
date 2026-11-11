@@ -18,7 +18,9 @@ STATUS_META = {
     404: ("NotFound", "Ресурс не найден"),
     405: ("MethodNotAllowed", "Метод не поддерживается"),
     409: ("Conflict", "Конфликт данных"),
+    429: ("TooManyRequests", "Слишком много запросов"),
     500: ("InternalServerError", "Внутренняя ошибка сервера"),
+    503: ("ServiceUnavailable", "Сервис временно недоступен"),
 }
 
 

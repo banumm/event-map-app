@@ -13,7 +13,6 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
-    PrimaryKeyConstraint,
     String,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship

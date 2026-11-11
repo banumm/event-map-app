@@ -1,0 +1,12 @@
+# Не попадают в образ: секреты, локальные БД, кэши, тесты.
+.env
+*.db
+*.sqlite3
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage*
+htmlcov/
+tests/
+Dockerfile
+.dockerignore

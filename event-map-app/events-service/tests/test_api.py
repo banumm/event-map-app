@@ -206,3 +206,173 @@ def test_unknown_route_returns_unified_error(client):
     response = client.get("/unknown-route")
     assert response.status_code == 404
     assert response.get_json()["error"]["code"] == "NotFound"
+
+
+# ---------------------------------------------------------------------------
+# ПР6: кэширование GET /events и GET /events/{id}
+# ---------------------------------------------------------------------------
+
+def _db_down(*args, **kwargs):
+    from sqlalchemy.exc import OperationalError
+
+    raise OperationalError("SELECT 1", {}, Exception("connection refused (test)"))
+
+
+def _db_queries():
+    from observability import metrics
+
+    return metrics.value("db_queries_total")
+
+
+def test_list_second_request_is_cache_hit_without_db_queries(client, org_headers):
+    create_event(client, org_headers)
+
+    first = client.get("/events")
+    assert first.headers["X-Cache"] == "MISS"
+
+    queries_before = _db_queries()
+    second = client.get("/events")
+    assert second.headers["X-Cache"] == "HIT"
+    assert second.get_json() == first.get_json()
+    assert _db_queries() == queries_before  # попадание в кэш не обращается к БД
+
+
+def test_different_query_params_use_different_cache_keys(client, org_headers):
+    create_event(client, org_headers)
+    assert client.get("/events?page=1&limit=5").headers["X-Cache"] == "MISS"
+    assert client.get("/events?page=1&limit=10").headers["X-Cache"] == "MISS"
+    assert client.get("/events?page=1&limit=5").headers["X-Cache"] == "HIT"
+
+
+def test_create_invalidates_cached_list(client, org_headers):
+    assert client.get("/events").get_json()["total"] == 0
+    assert client.get("/events").headers["X-Cache"] == "HIT"
+
+    create_event(client, org_headers)
+    response = client.get("/events")
+    assert response.headers["X-Cache"] == "MISS"
+    assert response.get_json()["total"] == 1
+
+
+def test_patch_invalidates_cached_item_and_list(client, org_headers):
+    event = create_event(client, org_headers)
+    client.get(f"/events/{event['id']}")
+    client.get("/events")
+    assert client.get(f"/events/{event['id']}").headers["X-Cache"] == "HIT"
+
+    client.patch(f"/events/{event['id']}", json={"title": "Новое название"}, headers=org_headers)
+
+    item = client.get(f"/events/{event['id']}")
+    assert item.headers["X-Cache"] == "MISS"
+    assert item.get_json()["title"] == "Новое название"
+    listing = client.get("/events")
+    assert listing.headers["X-Cache"] == "MISS"
+    assert listing.get_json()["items"][0]["title"] == "Новое название"
+
+
+def test_delete_invalidates_cached_item(client, org_headers):
+    event = create_event(client, org_headers)
+    assert client.get(f"/events/{event['id']}").status_code == 200
+    assert client.get(f"/events/{event['id']}").headers["X-Cache"] == "HIT"
+
+    assert client.delete(f"/events/{event['id']}", headers=org_headers).status_code == 204
+    assert client.get(f"/events/{event['id']}").status_code == 404
+
+
+def test_not_found_is_not_cached(client):
+    missing = str(uuid.uuid4())
+    assert client.get(f"/events/{missing}").status_code == 404
+    response = client.get(f"/events/{missing}")
+    assert response.status_code == 404
+    assert response.headers.get("X-Cache") is None
+
+
+def test_database_down_without_cache_returns_503(client, monkeypatch):
+    from repository.events import EventRepository
+
+    monkeypatch.setattr(EventRepository, "count", _db_down)
+    response = client.get("/events")
+    assert response.status_code == 503
+    assert response.get_json()["error"]["code"] == "ServiceUnavailable"
+
+
+def test_database_down_serves_stale_cache(client, org_headers, monkeypatch):
+    import time
+
+    from cache import events_cache
+    from repository.events import EventRepository
+
+    create_event(client, org_headers)
+    fresh = client.get("/events")
+    assert fresh.headers["X-Cache"] == "MISS"
+
+    # Запись просрочена (TTL 60 с), но ещё в окне stale (300 с), БД «упала».
+    monkeypatch.setattr(events_cache, "_clock", lambda: time.monotonic() + 120)
+    monkeypatch.setattr(EventRepository, "count", _db_down)
+    response = client.get("/events")
+    assert response.status_code == 200
+    assert response.headers["X-Cache"] == "STALE"
+    assert response.get_json() == fresh.get_json()
+
+
+def test_write_with_database_down_returns_503(client, org_headers, monkeypatch):
+    from repository.categories import CategoryRepository
+
+    monkeypatch.setattr(CategoryRepository, "get_or_create", _db_down)
+    response = client.post("/events", json=EVENT, headers=org_headers)
+    assert response.status_code == 503
+    assert response.get_json()["error"]["code"] == "ServiceUnavailable"
+
+
+# ---------------------------------------------------------------------------
+# ПР7: /health, /metrics, X-Request-ID
+# ---------------------------------------------------------------------------
+
+def test_health_reports_database_ok(client):
+    response = client.get("/health")
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["status"] == "ok"
+    assert body["checks"]["database"]["status"] == "ok"
+
+
+def test_health_returns_503_when_database_unavailable(client, monkeypatch):
+    import importlib
+
+    app_module = importlib.import_module("app")
+    monkeypatch.setattr(app_module, "check_database", lambda: (False, "connection refused"))
+    response = client.get("/health")
+    assert response.status_code == 503
+    body = response.get_json()
+    assert body["status"] == "unavailable"
+    assert body["checks"]["database"]["status"] == "error"
+
+
+def test_metrics_endpoint_exposes_counters(client):
+    client.get("/events")
+    client.get("/events")
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    text = response.get_data(as_text=True)
+    assert 'http_requests_total{method="GET",path="/events",status="200"}' in text
+    assert "cache_hits_total" in text
+    assert "cache_misses_total" in text
+    assert "db_queries_total" in text
+
+
+def test_request_id_is_propagated(client):
+    response = client.get("/health", headers={"X-Request-ID": "demo-123"})
+    assert response.headers["X-Request-ID"] == "demo-123"
+    generated = client.get("/health").headers["X-Request-ID"]
+    assert len(generated) == 32
+
+
+def test_filter_by_category_missing_in_db_returns_empty(client, org_headers, monkeypatch):
+    """Регрессия: отсутствующая в справочнике категория не должна отключать фильтр."""
+    from repository.categories import CategoryRepository
+
+    create_event(client, org_headers)
+    monkeypatch.setattr(CategoryRepository, "get_by_name", lambda self, name: None)
+    body = client.get("/events?category=lecture").get_json()
+    assert body["total"] == 0
+    assert body["items"] == []

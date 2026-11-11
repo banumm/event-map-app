@@ -6,7 +6,6 @@
 Запуск: python verify.py
 """
 
-import json
 import os
 import subprocess
 import sys
