@@ -57,6 +57,8 @@ jobs:
     name: Docker build + compose smoke test
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # только для ветки ci-results с отчётом (шаг ниже)
     steps:
       - uses: actions/checkout@v4
       - name: Create .env for CI (random secrets, not stored in repo)
@@ -96,7 +98,20 @@ jobs:
             docker compose logs --no-color --no-log-prefix attendance-service \
               | grep -E '"event": "(events_service|attendance|health)\.' | head -15 || true
             echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee ci-report.md >> "$GITHUB_STEP_SUMMARY"
+      # Отчёт также сохраняется в ветку ci-results (docs для ПР6/ПР7 без входа в Actions).
+      - name: Save report to ci-results branch
+        if: always() && github.event_name == 'push'
+        run: |
+          mkdir -p /tmp/report && cp ci-report.md /tmp/report/README.md
+          docker compose logs --no-color --no-log-prefix > /tmp/report/compose-logs.txt || true
+          cd /tmp/report
+          git init -q -b ci-results
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "CI report for ${GITHUB_SHA::7} [skip ci]"
+          git push -q --force "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-results
       - name: Stop
         if: always()
         run: docker compose down -v
