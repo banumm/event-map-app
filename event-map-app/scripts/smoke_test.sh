@@ -15,12 +15,13 @@ USERS=${USERS_URL:-http://localhost:8000}
 EVENTS=${EVENTS_URL:-http://localhost:5001}
 ATTEND=${ATTENDANCE_URL:-http://localhost:5002}
 RUN_ID=$(date +%s)
+PY=${PYTHON:-python3}   # на Windows (Git Bash): PYTHON=python
 PASS=0
 FAIL=0
 
 # Поле из тела последнего ответа: body_field id  /  body_field access_token
 body_field() {
-  python3 -c "import json,sys
+  "$PY" -c "import json,sys
 try: print(json.load(open('/tmp/smoke_body'))[sys.argv[1]])
 except Exception: print('')" "$1"
 }
@@ -33,7 +34,9 @@ request() {
               -H 'Content-Type: application/json' -H "X-Request-ID: smoke-$RUN_ID")
   [ -n "$body" ] && args+=(-d "$body")
   [ -n "$token" ] && args+=(-H "Authorization: Bearer $token")
-  STATUS=$(curl "${args[@]}" || echo 000)
+  : > /tmp/smoke_body
+  STATUS=$(curl "${args[@]}" 2>/dev/null) || true   # при ошибке соединения curl сам печатает 000
+  [ -n "$STATUS" ] || STATUS=000
   HEADERS=$(cat /tmp/smoke_headers 2>/dev/null || true)
 }
 
@@ -45,7 +48,7 @@ check() {  # check "описание" ожидаемый_статус [ожид�
     PASS=$((PASS + 1)); printf '  [OK]   %-55s %s %s\n' "$name" "$STATUS" "$got_cache"
   else
     FAIL=$((FAIL + 1)); printf '  [FAIL] %-55s got %s %s, expected %s %s\n' "$name" "$STATUS" "$got_cache" "$expected" "$cache"
-    head -c 300 /tmp/smoke_body; echo
+    head -c 300 /tmp/smoke_body 2>/dev/null; echo
   fi
 }
 
