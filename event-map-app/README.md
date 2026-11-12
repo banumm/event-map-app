@@ -130,6 +130,9 @@ Django-сессии оставлены только для админ-панел
 - **CI** — [.github/workflows/ci.yml](../.github/workflows/ci.yml): ruff → тесты +
   coverage → сборка образов → `docker compose up --wait` → `scripts/smoke_test.sh --db-down`.
 - Протокол финальной проверки — [docs/deploy-check.md](docs/deploy-check.md).
+- Отчёт последнего запуска CI (`docker compose ps`, вывод smoke-теста — 32 проверки,
+  логи кэша) автоматически сохраняется в ветку
+  [`ci-results`](https://github.com/banumm/event-map-app/tree/ci-results).
 
 ## СРС №1: презентация
 
