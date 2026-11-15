@@ -15,15 +15,13 @@ USERS=${USERS_URL:-http://localhost:8000}
 EVENTS=${EVENTS_URL:-http://localhost:5001}
 ATTEND=${ATTENDANCE_URL:-http://localhost:5002}
 RUN_ID=$(date +%s)
-PY=${PYTHON:-python3}   # на Windows (Git Bash): PYTHON=python
 PASS=0
 FAIL=0
 
-# Поле из тела последнего ответа: body_field id  /  body_field access_token
+# Строковое поле верхнего уровня из тела последнего ответа: body_field id / access_token.
+# Без Python: на Windows «python» часто оказывается заглушкой Microsoft Store.
 body_field() {
-  "$PY" -c "import json,sys
-try: print(json.load(open('/tmp/smoke_body'))[sys.argv[1]])
-except Exception: print('')" "$1"
+  tr -d '\n' < /tmp/smoke_body | sed -n "s/.*\"$1\": *\"\([^\"]*\)\".*/\1/p"
 }
 
 # request METHOD URL [BODY] [TOKEN] -> тело в /tmp/smoke_body, статус в $STATUS, заголовки в $HEADERS.
@@ -89,12 +87,12 @@ request GET "$EVENTS/events?limit=50";  check "GET /events — первый за
 request GET "$EVENTS/events?limit=50";  check "GET /events — повтор в пределах TTL" 200 HIT
 request GET "$EVENTS/events/$EVENT_ID"; check "GET /events/{id} — первый запрос" 200 MISS
 request GET "$EVENTS/events/$EVENT_ID"; check "GET /events/{id} — повтор" 200 HIT
-request PATCH "$EVENTS/events/$EVENT_ID" '{"title":"Концерт перенесён"}' "$ORG_TOKEN"
+request PATCH "$EVENTS/events/$EVENT_ID" '{"title":"Concert moved"}' "$ORG_TOKEN"
 check "PATCH события → 200" 200
 request GET "$EVENTS/events/$EVENT_ID"
 check "после PATCH кэш сброшен" 200 MISS
 TITLE=$(body_field title)
-[ "$TITLE" = "Концерт перенесён" ] && { PASS=$((PASS+1)); echo "  [OK]   в ответе новое название"; } \
+[ "$TITLE" = "Concert moved" ] && { PASS=$((PASS+1)); echo "  [OK]   в ответе новое название"; } \
   || { FAIL=$((FAIL+1)); echo "  [FAIL] в ответе старое название: $TITLE"; }
 request GET "$EVENTS/events?limit=50";  check "список после PATCH" 200 MISS
 
