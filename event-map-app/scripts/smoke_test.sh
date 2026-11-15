@@ -74,7 +74,7 @@ request POST "$USERS/auth/login" "{\"username\":\"$USR\",\"password\":\"wrong-pa
 check "неверный пароль → 401" 401
 
 echo "== 3. CRUD событий и роли (ПР2, ПР4)"
-EVENT='{"title":"Концерт в парке","description":"Живая музыка","lat":43.2389,"lng":76.8897,"starts_at":"2026-12-20T19:00:00Z","category":"concert"}'
+EVENT='{"title":"Concert in the park","description":"Live music","lat":43.2389,"lng":76.8897,"starts_at":"2026-12-20T19:00:00Z","category":"concert"}'
 request POST "$EVENTS/events" "$EVENT";                 check "создание без токена → 401" 401
 request POST "$EVENTS/events" "$EVENT" "$USR_TOKEN";    check "создание ролью user → 403" 403
 request POST "$EVENTS/events" '{"title":"x"}' "$ORG_TOKEN"; check "невалидные данные → 400" 400
