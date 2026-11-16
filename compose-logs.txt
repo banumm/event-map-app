@@ -1,0 +1,190 @@
+[2026-11-16 15:47:30 +0000] [1] [INFO] Starting gunicorn 23.0.0
+[2026-11-16 15:47:30 +0000] [1] [INFO] Listening at: http://0.0.0.0:5002 (1)
+[2026-11-16 15:47:30 +0000] [1] [INFO] Using worker: gthread
+[2026-11-16 15:47:30 +0000] [7] [INFO] Booting worker with pid: 7
+{"ts": "2026-11-16T15:47:35.573+00:00", "level": "INFO", "service": "attendance-service", "logger": "attendance-service.access", "msg": "request", "request_id": "989d34e441424939a2f5aaec7f1bdbb3", "event": "http.request", "method": "GET", "path": "/health", "status": 200, "duration_ms": 9.25}
+{"ts": "2026-11-16T15:47:35.913+00:00", "level": "INFO", "service": "attendance-service", "logger": "attendance-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/health", "status": 200, "duration_ms": 2.18}
+{"ts": "2026-11-16T15:47:36.931+00:00", "level": "INFO", "service": "attendance-service", "logger": "attendance-service.events-client", "msg": "events-service call", "request_id": "smoke-1794844055", "event": "events_service.call", "event_id": "cbd60be6-a525-43fb-89d3-68cdcdc88929", "status": 200, "attempt": 1, "duration_ms": 1.5}
+{"ts": "2026-11-16T15:47:36.931+00:00", "level": "INFO", "service": "attendance-service", "logger": "attendance-service", "msg": "attendance marked", "request_id": "smoke-1794844055", "event": "attendance.created", "event_id": "cbd60be6-a525-43fb-89d3-68cdcdc88929", "user_id": "2", "status": "going"}
+{"ts": "2026-11-16T15:47:36.932+00:00", "level": "INFO", "service": "attendance-service", "logger": "attendance-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "POST", "path": "/attendance", "status": 201, "duration_ms": 1.99}
+{"ts": "2026-11-16T15:47:36.947+00:00", "level": "INFO", "service": "attendance-service", "logger": "attendance-service.events-client", "msg": "events-service call", "request_id": "smoke-1794844055", "event": "events_service.call", "event_id": "00000000-0000-0000-0000-000000000000", "status": 404, "attempt": 1, "duration_ms": 3.0}
+{"ts": "2026-11-16T15:47:36.948+00:00", "level": "INFO", "service": "attendance-service", "logger": "attendance-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "POST", "path": "/attendance", "status": 404, "duration_ms": 3.37}
+{"ts": "2026-11-16T15:47:36.961+00:00", "level": "INFO", "service": "attendance-service", "logger": "attendance-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/attendance/event/cbd60be6-a525-43fb-89d3-68cdcdc88929", "status": 200, "duration_ms": 0.08}
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+fixing permissions on existing directory /var/lib/postgresql/data ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+selecting default time zone ... UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+sh: locale: not found
+2026-11-16 15:47:18.985 UTC [34] WARNING:  no usable system locales were found
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/data -l logfile start
+
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+waiting for server to start....2026-11-16 15:47:19.695 UTC [40] LOG:  starting PostgreSQL 16.16 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+2026-11-16 15:47:19.696 UTC [40] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-16 15:47:19.701 UTC [43] LOG:  database system was shut down at 2026-11-16 15:47:19 UTC
+2026-11-16 15:47:19.705 UTC [40] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/10-init-databases.sh
+CREATE DATABASE
+
+waiting for server to shut down....2026-11-16 15:47:20.048 UTC [40] LOG:  received fast shutdown request
+2026-11-16 15:47:20.048 UTC [40] LOG:  aborting any active transactions
+2026-11-16 15:47:20.051 UTC [40] LOG:  background worker "logical replication launcher" (PID 46) exited with exit code 1
+2026-11-16 15:47:20.051 UTC [41] LOG:  shutting down
+2026-11-16 15:47:20.051 UTC [41] LOG:  checkpoint starting: shutdown immediate
+2026-11-16 15:47:20.256 UTC [41] LOG:  checkpoint complete: wrote 1864 buffers (11.4%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.201 s, sync=0.002 s, total=0.205 s; sync files=597, longest=0.001 s, average=0.001 s; distance=8710 kB, estimate=8710 kB; lsn=0/1D8A750, redo lsn=0/1D8A750
+2026-11-16 15:47:20.264 UTC [40] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+2026-11-16 15:47:20.367 UTC [1] LOG:  starting PostgreSQL 16.16 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+2026-11-16 15:47:20.367 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-16 15:47:20.367 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-11-16 15:47:20.475 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-16 15:47:20.477 UTC [59] LOG:  database system was shut down at 2026-11-16 15:47:20 UTC
+2026-11-16 15:47:20.556 UTC [1] LOG:  database system is ready to accept connections
+2026-11-16 15:47:37.078 UTC [1] LOG:  received fast shutdown request
+2026-11-16 15:47:37.079 UTC [1] LOG:  aborting any active transactions
+2026-11-16 15:47:37.079 UTC [81] FATAL:  terminating connection due to administrator command
+2026-11-16 15:47:37.079 UTC [73] FATAL:  terminating connection due to administrator command
+2026-11-16 15:47:37.081 UTC [1] LOG:  background worker "logical replication launcher" (PID 62) exited with exit code 1
+2026-11-16 15:47:37.085 UTC [57] LOG:  shutting down
+2026-11-16 15:47:37.085 UTC [57] LOG:  checkpoint starting: shutdown immediate
+2026-11-16 15:47:37.167 UTC [57] LOG:  checkpoint complete: wrote 210 buffers (1.3%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.073 s, sync=0.009 s, total=0.083 s; sync files=155, longest=0.008 s, average=0.001 s; distance=764 kB, estimate=764 kB; lsn=0/1E49780, redo lsn=0/1E49780
+2026-11-16 15:47:37.172 UTC [1] LOG:  database system is shut down
+
+PostgreSQL Database directory appears to contain a database; Skipping initialization
+
+2026-11-16 15:47:39.807 UTC [1] LOG:  starting PostgreSQL 16.16 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+2026-11-16 15:47:39.807 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-16 15:47:39.807 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-11-16 15:47:39.808 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-16 15:47:39.813 UTC [29] LOG:  database system was shut down at 2026-11-16 15:47:37 UTC
+2026-11-16 15:47:39.822 UTC [1] LOG:  database system is ready to accept connections
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001, create categories and events tables
+INFO  [alembic.runtime.migration] Running upgrade 0001 -> 0002, add slug to categories and composite index for frequent filter
+INFO  [alembic.runtime.migration] Running upgrade 0002 -> 0003, create users and event_participants tables
+{"level":"INFO","service":"events-service","event":"migrations.applied"}
+[2026-11-16 15:47:25 +0000] [1] [INFO] Starting gunicorn 23.0.0
+[2026-11-16 15:47:25 +0000] [1] [INFO] Listening at: http://0.0.0.0:5001 (1)
+[2026-11-16 15:47:25 +0000] [1] [INFO] Using worker: gthread
+[2026-11-16 15:47:25 +0000] [8] [INFO] Booting worker with pid: 8
+{"ts": "2026-11-16T15:47:26.220+00:00", "level": "INFO", "service": "events-service", "logger": "events-service", "msg": "database connected", "event": "db.connected", "backend": "postgresql", "url": "postgresql+psycopg2://eventmap:***@db:5432/events_db"}
+{"ts": "2026-11-16T15:47:26.233+00:00", "level": "INFO", "service": "events-service", "logger": "events-service", "msg": "categories seeded", "event": "db.seeded"}
+{"ts": "2026-11-16T15:47:29.789+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "1edf256c249742ae919097ddb0089367", "event": "http.request", "method": "GET", "path": "/health", "status": 200, "duration_ms": 1.12}
+{"ts": "2026-11-16T15:47:35.573+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "989d34e441424939a2f5aaec7f1bdbb3", "event": "http.request", "method": "GET", "path": "/health", "status": 200, "duration_ms": 0.76}
+{"ts": "2026-11-16T15:47:35.898+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/health", "status": 200, "duration_ms": 0.69}
+{"ts": "2026-11-16T15:47:35.913+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/health", "status": 200, "duration_ms": 0.64}
+{"ts": "2026-11-16T15:47:36.480+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "POST", "path": "/events", "status": 401, "duration_ms": 0.09}
+{"ts": "2026-11-16T15:47:36.493+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "POST", "path": "/events", "status": 403, "duration_ms": 0.27}
+{"ts": "2026-11-16T15:47:36.782+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "POST", "path": "/events", "status": 400, "duration_ms": 0.36}
+{"ts": "2026-11-16T15:47:36.799+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache invalidate", "request_id": "smoke-1794844055", "event": "cache.invalidate", "removed": 0, "prefix": "events:list:", "keys": ["events:item:cbd60be6-a525-43fb-89d3-68cdcdc88929"], "reason": "event created"}
+{"ts": "2026-11-16T15:47:36.799+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "POST", "path": "/events", "status": 201, "duration_ms": 4.74}
+{"ts": "2026-11-16T15:47:36.815+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache miss", "request_id": "smoke-1794844055", "event": "cache.miss", "key": "events:list:page=1&limit=50&category=&from=&to=", "reason": "absent"}
+{"ts": "2026-11-16T15:47:36.822+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.service", "msg": "events loaded from database", "request_id": "smoke-1794844055", "event": "db.query", "operation": "events.list", "rows": 1}
+{"ts": "2026-11-16T15:47:36.822+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache set", "request_id": "smoke-1794844055", "event": "cache.set", "key": "events:list:page=1&limit=50&category=&from=&to=", "ttl_s": 60.0}
+{"ts": "2026-11-16T15:47:36.822+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/events", "status": 200, "duration_ms": 7.26}
+{"ts": "2026-11-16T15:47:36.834+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache hit", "request_id": "smoke-1794844055", "event": "cache.hit", "key": "events:list:page=1&limit=50&category=&from=&to=", "ttl_left_s": 60.0}
+{"ts": "2026-11-16T15:47:36.835+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/events", "status": 200, "duration_ms": 0.21}
+{"ts": "2026-11-16T15:47:36.847+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache miss", "request_id": "smoke-1794844055", "event": "cache.miss", "key": "events:item:cbd60be6-a525-43fb-89d3-68cdcdc88929", "reason": "absent"}
+{"ts": "2026-11-16T15:47:36.850+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache set", "request_id": "smoke-1794844055", "event": "cache.set", "key": "events:item:cbd60be6-a525-43fb-89d3-68cdcdc88929", "ttl_s": 60.0}
+{"ts": "2026-11-16T15:47:36.850+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/events/cbd60be6-a525-43fb-89d3-68cdcdc88929", "status": 200, "duration_ms": 2.95}
+{"ts": "2026-11-16T15:47:36.862+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache hit", "request_id": "smoke-1794844055", "event": "cache.hit", "key": "events:item:cbd60be6-a525-43fb-89d3-68cdcdc88929", "ttl_left_s": 60.0}
+{"ts": "2026-11-16T15:47:36.862+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/events/cbd60be6-a525-43fb-89d3-68cdcdc88929", "status": 200, "duration_ms": 0.15}
+{"ts": "2026-11-16T15:47:36.877+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache invalidate", "request_id": "smoke-1794844055", "event": "cache.invalidate", "removed": 2, "prefix": "events:list:", "keys": ["events:item:cbd60be6-a525-43fb-89d3-68cdcdc88929"], "reason": "event updated"}
+{"ts": "2026-11-16T15:47:36.877+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "PATCH", "path": "/events/cbd60be6-a525-43fb-89d3-68cdcdc88929", "status": 200, "duration_ms": 3.25}
+{"ts": "2026-11-16T15:47:36.890+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache miss", "request_id": "smoke-1794844055", "event": "cache.miss", "key": "events:item:cbd60be6-a525-43fb-89d3-68cdcdc88929", "reason": "absent"}
+{"ts": "2026-11-16T15:47:36.891+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache set", "request_id": "smoke-1794844055", "event": "cache.set", "key": "events:item:cbd60be6-a525-43fb-89d3-68cdcdc88929", "ttl_s": 60.0}
+{"ts": "2026-11-16T15:47:36.891+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/events/cbd60be6-a525-43fb-89d3-68cdcdc88929", "status": 200, "duration_ms": 1.46}
+{"ts": "2026-11-16T15:47:36.906+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache miss", "request_id": "smoke-1794844055", "event": "cache.miss", "key": "events:list:page=1&limit=50&category=&from=&to=", "reason": "absent"}
+{"ts": "2026-11-16T15:47:36.911+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.service", "msg": "events loaded from database", "request_id": "smoke-1794844055", "event": "db.query", "operation": "events.list", "rows": 1}
+{"ts": "2026-11-16T15:47:36.911+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache set", "request_id": "smoke-1794844055", "event": "cache.set", "key": "events:list:page=1&limit=50&category=&from=&to=", "ttl_s": 60.0}
+{"ts": "2026-11-16T15:47:36.911+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/events", "status": 200, "duration_ms": 4.45}
+{"ts": "2026-11-16T15:47:36.931+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache hit", "request_id": "smoke-1794844055", "event": "cache.hit", "key": "events:item:cbd60be6-a525-43fb-89d3-68cdcdc88929", "ttl_left_s": 60.0}
+{"ts": "2026-11-16T15:47:36.931+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/events/cbd60be6-a525-43fb-89d3-68cdcdc88929", "status": 200, "duration_ms": 0.16}
+{"ts": "2026-11-16T15:47:36.945+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache miss", "request_id": "smoke-1794844055", "event": "cache.miss", "key": "events:item:00000000-0000-0000-0000-000000000000", "reason": "absent"}
+{"ts": "2026-11-16T15:47:36.947+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/events/00000000-0000-0000-0000-000000000000", "status": 404, "duration_ms": 1.75}
+{"ts": "2026-11-16T15:47:36.974+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache hit", "request_id": "smoke-1794844055", "event": "cache.hit", "key": "events:list:page=1&limit=50&category=&from=&to=", "ttl_left_s": 59.9}
+{"ts": "2026-11-16T15:47:36.974+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/events", "status": 200, "duration_ms": 0.24}
+{"ts": "2026-11-16T15:47:39.378+00:00", "level": "WARNING", "service": "events-service", "logger": "events-service", "msg": "health check failed", "request_id": "smoke-1794844055", "event": "health.fail", "dependency": "database"}
+{"ts": "2026-11-16T15:47:39.378+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/health", "status": 503, "duration_ms": 8.31}
+{"ts": "2026-11-16T15:47:39.426+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache hit", "request_id": "smoke-1794844055", "event": "cache.hit", "key": "events:list:page=1&limit=50&category=&from=&to=", "ttl_left_s": 57.5}
+{"ts": "2026-11-16T15:47:39.427+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/events", "status": 200, "duration_ms": 0.27}
+{"ts": "2026-11-16T15:47:39.439+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache miss", "request_id": "smoke-1794844055", "event": "cache.miss", "key": "events:list:page=1&limit=7&category=&from=&to=", "reason": "absent"}
+{"ts": "2026-11-16T15:47:39.484+00:00", "level": "ERROR", "service": "events-service", "logger": "events-service.service", "msg": "database unavailable", "request_id": "smoke-1794844055", "event": "db.unavailable", "operation": "events.list", "error": "could not translate host name \"db\" to address: Name or service not known\n"}
+{"ts": "2026-11-16T15:47:39.484+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/events", "status": 503, "duration_ms": 44.63}
+{"ts": "2026-11-16T15:47:39.779+00:00", "level": "WARNING", "service": "events-service", "logger": "events-service", "msg": "health check failed", "request_id": "smoke-1794844055", "event": "health.fail", "dependency": "database"}
+{"ts": "2026-11-16T15:47:39.780+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/health", "status": 503, "duration_ms": 0.84}
+{"ts": "2026-11-16T15:47:40.039+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "fef5bca32f5c4ac4b661f00796be6df8", "event": "http.request", "method": "GET", "path": "/health", "status": 200, "duration_ms": 13.83}
+{"ts": "2026-11-16T15:47:40.794+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/health", "status": 200, "duration_ms": 0.77}
+{"ts": "2026-11-16T15:47:40.819+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache invalidate", "request_id": "smoke-1794844055", "event": "cache.invalidate", "removed": 2, "prefix": "events:list:", "keys": ["events:item:cbd60be6-a525-43fb-89d3-68cdcdc88929"], "reason": "event deleted"}
+{"ts": "2026-11-16T15:47:40.819+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "DELETE", "path": "/events/cbd60be6-a525-43fb-89d3-68cdcdc88929", "status": 204, "duration_ms": 10.52}
+{"ts": "2026-11-16T15:47:40.832+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.cache", "msg": "cache miss", "request_id": "smoke-1794844055", "event": "cache.miss", "key": "events:item:cbd60be6-a525-43fb-89d3-68cdcdc88929", "reason": "absent"}
+{"ts": "2026-11-16T15:47:40.834+00:00", "level": "INFO", "service": "events-service", "logger": "events-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/events/cbd60be6-a525-43fb-89d3-68cdcdc88929", "status": 404, "duration_ms": 1.48}
+Operations to perform:
+  Apply all migrations: accounts, admin, auth, contenttypes, sessions
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying accounts.0001_initial... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying sessions.0001_initial... OK
+{"level":"INFO","service":"users-service","event":"migrations.applied"}
+[2026-11-16 15:47:25 +0000] [1] [INFO] Starting gunicorn 23.0.0
+[2026-11-16 15:47:25 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)
+[2026-11-16 15:47:25 +0000] [1] [INFO] Using worker: gthread
+[2026-11-16 15:47:25 +0000] [8] [INFO] Booting worker with pid: 8
+{"ts": "2026-11-16T15:47:29.794+00:00", "level": "INFO", "service": "users-service", "logger": "users-service.access", "msg": "request", "request_id": "a20fe35e6d5640549abb1ead8a6b8a62", "event": "http.request", "method": "GET", "path": "/health", "status": 200, "duration_ms": 32.43}
+{"ts": "2026-11-16T15:47:35.884+00:00", "level": "INFO", "service": "users-service", "logger": "users-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/health", "status": 200, "duration_ms": 0.63}
+{"ts": "2026-11-16T15:47:36.024+00:00", "level": "INFO", "service": "users-service", "logger": "users-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "POST", "path": "/auth/register", "status": 201, "duration_ms": 85.75}
+{"ts": "2026-11-16T15:47:36.040+00:00", "level": "INFO", "service": "users-service", "logger": "users-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "POST", "path": "/auth/register", "status": 409, "duration_ms": 1.43}
+{"ts": "2026-11-16T15:47:36.139+00:00", "level": "INFO", "service": "users-service", "logger": "users-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "POST", "path": "/auth/register", "status": 201, "duration_ms": 84.69}
+{"ts": "2026-11-16T15:47:36.244+00:00", "level": "INFO", "service": "users-service", "logger": "users-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "POST", "path": "/auth/login", "status": 200, "duration_ms": 89.49}
+{"ts": "2026-11-16T15:47:36.372+00:00", "level": "INFO", "service": "users-service", "logger": "users-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "POST", "path": "/auth/login", "status": 200, "duration_ms": 110.08}
+{"ts": "2026-11-16T15:47:36.465+00:00", "level": "INFO", "service": "users-service", "logger": "users-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "POST", "path": "/auth/login", "status": 401, "duration_ms": 75.15}
+{"ts": "2026-11-16T15:47:39.399+00:00", "level": "WARNING", "service": "users-service", "logger": "users-service", "msg": "health check failed", "request_id": "smoke-1794844055", "event": "health.fail", "dependency": "database"}
+{"ts": "2026-11-16T15:47:39.399+00:00", "level": "INFO", "service": "users-service", "logger": "users-service.access", "msg": "request", "request_id": "smoke-1794844055", "event": "http.request", "method": "GET", "path": "/health", "status": 503, "duration_ms": 7.11}
+{"ts": "2026-11-16T15:47:39.399+00:00", "level": "ERROR", "service": "users-service", "logger": "django.request", "msg": "Service Unavailable: /health", "status_code": 503}
+{"ts": "2026-11-16T15:47:40.044+00:00", "level": "INFO", "service": "users-service", "logger": "users-service.access", "msg": "request", "request_id": "087dc4e144894abbb8c1d3f5bdba9c58", "event": "http.request", "method": "GET", "path": "/health", "status": 200, "duration_ms": 13.34}
